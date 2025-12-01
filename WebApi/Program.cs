@@ -66,7 +66,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Re
 builder.Services.AddPersistence();
 
 var jwtTokenConfig = builder.InstallConfigFromSection<IJwtTokenConfig, JwtTokenConfig>("JwtToken");
-var biddingConfig = builder.InstallConfigFromSection<IBiddingConfig, BiddingConfig>("BiddingConfig");
+builder.InstallConfigFromSection<IBiddingConfig, BiddingConfig>("BiddingConfig");
 
 builder.Services.AddAuthentication(x =>
 {
