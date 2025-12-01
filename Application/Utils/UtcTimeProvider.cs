@@ -1,3 +1,5 @@
+using Application.Api.Utils;
+
 namespace Application.Utils;
 
 public class UtcTimeProvider : ITimeProvider

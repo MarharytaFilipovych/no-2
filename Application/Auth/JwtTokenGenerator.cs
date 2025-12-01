@@ -9,7 +9,7 @@ using Configs;
 
 public class JwtTokenGenerator(IJwtTokenConfig config) : IJwtTokenGenerator
 {
-    public string GenerateJwtToken(int id, IEnumerable<string> permissions)
+    public string GenerateJwtToken(Guid id, IEnumerable<string> permissions)
     {
         var claims = new List<Claim>
         {

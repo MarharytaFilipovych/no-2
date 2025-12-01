@@ -1,3 +1,6 @@
+using Application.Api.Auctions;
+using Application.Api.Users;
+
 namespace Infrastructure.InMemory;
 
 using Application.Api;
@@ -10,5 +13,7 @@ public static class InMemoryInstallerExtensions
     {
         services.AddSingleton<IUsersRepository, UserRepository>();
         services.AddSingleton<ISessionsRepository, SessionsRepository>();
+        services.AddSingleton<IAuctionsRepository, AuctionsRepository>();
+        services.AddSingleton<IBidsRepository, BidsRepository>();
     }
 }

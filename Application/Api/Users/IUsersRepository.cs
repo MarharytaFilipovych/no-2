@@ -1,12 +1,12 @@
-namespace Application.Api;
-
 using Domain.Users;
+
+namespace Application.Api.Users;
 
 public interface IUsersRepository
 {
     Task<bool> UserExists(string email);
     
-    Task<bool> UserExists(int userId);
+    Task<bool> UserExists(Guid userId);
 
     Task<string?> GetUserPassword(string email);
 

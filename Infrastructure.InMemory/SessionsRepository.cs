@@ -4,11 +4,11 @@ using Application.API.Users;
 
 public class SessionsRepository : ISessionsRepository
 {
-    private readonly List<UserSession> allSessions = new();
+    private readonly List<UserSession> _allSessions = [];
 
-    public Task<List<UserSession>> GetActiveSessions(int user)
+    public Task<List<UserSession>> GetActiveSessions(Guid user)
     {
-        return Task.FromResult(allSessions.Where(session => session.UserId == user).ToList());
+        return Task.FromResult(_allSessions.Where(session => session.UserId == user).ToList());
     }
 
     public async Task DropSession(string sessionId)
@@ -16,19 +16,19 @@ public class SessionsRepository : ISessionsRepository
         var session = await GetUserSession(sessionId);
         if (session != null)
         {
-            allSessions.Remove(session);
+            _allSessions.Remove(session);
         }
     }
 
     public Task SaveSession(UserSession session)
     {
-        allSessions.Add(session);
+        _allSessions.Add(session);
         return Task.CompletedTask;
     }
 
     public Task<UserSession?> GetUserSession(string session)
     {
-        return Task.FromResult(allSessions.FirstOrDefault(userSession => userSession.SessionId == session));
+        return Task.FromResult(_allSessions.FirstOrDefault(userSession => userSession.SessionId == session));
     }
 
     public async Task UpdateRefreshToken(string sessionId, string token, DateTime expirationTime)
@@ -40,7 +40,7 @@ public class SessionsRepository : ISessionsRepository
         }
         
         await DropSession(sessionId);
-        await SaveSession(new UserSession()
+        await SaveSession(new UserSession
         {
             RefreshToken = token,
             SessionId = sessionId,
