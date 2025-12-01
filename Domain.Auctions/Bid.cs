@@ -9,6 +9,9 @@ public class Bid
     public DateTime PlacedAt { get; init; }
     public bool IsWithdrawn { get; private set; }
 
+    public bool CanBeWithdrawn(AuctionState auctionState) => 
+        !IsWithdrawn && auctionState == AuctionState.Active;
+    
     public void Withdraw()
     {
         if (IsWithdrawn)

@@ -1,9 +1,10 @@
 using Application.Api.Utils;
+using Application.Configs;
+using Domain.Auctions;
 
 namespace Application.Commands.Auctions;
 
 using Api.Auctions;
-using Domain.Auctions;
 using MediatR;
 using Utils;
 
@@ -25,22 +26,29 @@ public enum PlaceBidError
     AuctionNotFound,
     AuctionNotActive,
     BidTooLow,
-    UserAlreadyBid
+    UserAlreadyBid,
+    ExceedsMaxBidAmount,
+    ExceedsBalanceLimit
 }
 
-public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
-    IBidsRepository bidsRepository, ITimeProvider timeProvider)
+public class PlaceBidCommandHandler(
+    IAuctionsRepository auctionsRepository,
+    IBidsRepository bidsRepository,
+    ITimeProvider timeProvider,
+    IBiddingConfig biddingConfig,
+    IParticipantBalanceRepository balanceRepository)
     : IRequestHandler<PlaceBidCommand, PlaceBidCommand.Response>
 {
     public async Task<PlaceBidCommand.Response> Handle(
-        PlaceBidCommand request, CancellationToken cancellationToken)
+        PlaceBidCommand request,
+        CancellationToken cancellationToken)
     {
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
         if (auction == null)
             return ErrorResponse(PlaceBidError.AuctionNotFound);
 
         var currentTime = timeProvider.Now();
-        if (!auction.IsActive(currentTime)) 
+        if (!auction.IsActive(currentTime))
             return ErrorResponse(PlaceBidError.AuctionNotActive);
 
         var validationResult = await ValidateBid(auction, request);
@@ -55,7 +63,7 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
             PlacedAt = currentTime
         };
 
-        if (auction.Type == AuctionType.Blind) 
+        if (auction.Type == AuctionType.Blind)
             await RemovePreviousBidIfExists(request.AuctionId, request.UserId);
 
         var createdBid = await bidsRepository.CreateBid(bid);
@@ -71,10 +79,22 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
 
     private async Task<PlaceBidError?> ValidateBid(Auction auction, PlaceBidCommand request)
     {
+        var biddingRules = new BiddingRules(
+            biddingConfig.MaxBidAmount,
+            biddingConfig.BalanceRatioLimit);
+
+        if (!biddingRules.IsWithinMaxLimit(request.Amount))
+            return PlaceBidError.ExceedsMaxBidAmount;
+
+        var balance = await balanceRepository.GetBalance(request.UserId);
+
+        if (!biddingRules.IsWithinBalanceLimit(request.Amount, balance))
+            return PlaceBidError.ExceedsBalanceLimit;
+
         if (auction.Type == AuctionType.Open)
         {
             var highestBid = await bidsRepository.GetHighestBidForAuction(request.AuctionId);
-            var minimumRequired = (highestBid?.Amount ?? auction.MinPrice) 
+            var minimumRequired = (highestBid?.Amount ?? auction.MinPrice)
                                   + (auction.MinimumIncrement ?? 0);
 
             if (request.Amount < minimumRequired)
@@ -83,7 +103,7 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
         else
         {
             var existingBid = await bidsRepository.GetUserBidForAuction(request.AuctionId, request.UserId);
-            if (existingBid is { IsWithdrawn: false }) 
+            if (existingBid is { IsWithdrawn: false })
                 return PlaceBidError.UserAlreadyBid;
         }
 
@@ -116,4 +136,3 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
     private PlaceBidCommand.Response ErrorResponse(PlaceBidError error) =>
         new() { Result = OkOrError<PlaceBidError>.Error(error) };
 }
-

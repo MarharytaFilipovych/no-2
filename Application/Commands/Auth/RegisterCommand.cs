@@ -55,7 +55,7 @@ public class RegisterCommandHandler(
             RefreshToken = refreshToken.Value,
             SessionId = Guid.NewGuid().ToString(),
             ExpirationTime = refreshToken.ExpirationTime,
-            UserId = user.UserId
+            UserId = user!.UserId
         };
         
         await sessions.SaveSession(session);

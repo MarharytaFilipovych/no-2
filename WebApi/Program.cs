@@ -14,7 +14,6 @@ using Application.Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
 builder.Services.AddSingleton<ITimeProvider, UtcTimeProvider>();
@@ -24,10 +23,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAllForTesting",
         policy =>
         {
-            // Allow any origin during development. In production, you would
-            // replace WithOrigins("*") with a list of your specific frontend URLs
-            // e.g., .WithOrigins("https://myfrontend.com")
-            policy.SetIsOriginAllowed(_ => true) // Allows any origin
+            policy.SetIsOriginAllowed(_ => true)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials(); 
@@ -50,6 +46,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Re
 builder.Services.AddPersistence();
 
 var jwtTokenConfig = builder.InstallConfigFromSection<IJwtTokenConfig, JwtTokenConfig>("JwtToken");
+var biddingConfig = builder.InstallConfigFromSection<IBiddingConfig, BiddingConfig>("BiddingConfig");
 
 builder.Services.AddAuthentication(x =>
 {
