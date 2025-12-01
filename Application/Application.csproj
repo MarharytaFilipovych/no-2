@@ -15,6 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Domain.Auctions\Domain.Auctions.csproj" />
       <ProjectReference Include="..\Domain.Users\Domain.Users.csproj" />
     </ItemGroup>
 
