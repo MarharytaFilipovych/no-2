@@ -2,10 +2,10 @@
 
 public class Auction
 {
-    public required int AuctionId { get; init; }
+    public int AuctionId { get; init; }
     public required string Title { get; init; }
     public string? Description { get; init; }
-    public DateTime? StartTime { get; init; } = DateTime.Now;
+    public DateTime? StartTime { get; init; }
     public DateTime EndTime { get; set; }
     public AuctionType Type { get; init; } = AuctionType.Open;
     public decimal? MinimumIncrement { get; init; }

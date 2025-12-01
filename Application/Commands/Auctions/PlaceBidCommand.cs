@@ -72,7 +72,8 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
         if (auction.Type == AuctionType.Open)
         {
             var highestBid = await bidsRepository.GetHighestBidForAuction(request.AuctionId);
-            var minimumRequired = (highestBid?.Amount ?? auction.MinPrice) + (auction.MinimumIncrement ?? 0);
+            var minimumRequired = (highestBid?.Amount ?? auction.MinPrice) 
+                                  + (auction.MinimumIncrement ?? 0);
 
             if (request.Amount < minimumRequired)
                 return PlaceBidError.BidTooLow;
