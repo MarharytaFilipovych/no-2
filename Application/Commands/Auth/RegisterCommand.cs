@@ -1,28 +1,28 @@
+using Application.Api.Users;
+
 namespace Application.Commands.Auth;
 
-using Api;
 using API.System;
 using API.Users;
 using BCrypt.Net;
-using Domain.Users;
 using MediatR;
 using Utils;
 
 public class RegisterCommand : IRequest<RegisterCommand.Response>
 {
-    public string Email { get; init; }
+    public required string Email { get; init; }
 
-    public string Password { get; init; }
+    public required string Password { get; init; }
 
     public class Response
     {
         public OkOrError<RegistrationError> Status { get; init; }
 
-        public string JwtToken { get; init; }
+        public string? JwtToken { get; init; }
 
-        public string SessionId { get; init; }
+        public string? SessionId { get; init; }
 
-        public RefreshToken RefreshToken { get; init; }
+        public RefreshToken? RefreshToken { get; init; }
     }
 }
 

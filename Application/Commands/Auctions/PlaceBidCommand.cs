@@ -1,3 +1,5 @@
+using Application.Api.Utils;
+
 namespace Application.Commands.Auctions;
 
 using Api.Auctions;
@@ -7,14 +9,14 @@ using Utils;
 
 public class PlaceBidCommand : IRequest<PlaceBidCommand.Response>
 {
-    public int AuctionId { get; init; }
-    public int UserId { get; init; }
+    public Guid AuctionId { get; init; }
+    public Guid UserId { get; init; }
     public decimal Amount { get; init; }
 
     public class Response
     {
         public OkOrError<PlaceBidError> Result { get; init; }
-        public int BidId { get; init; }
+        public Guid BidId { get; init; }
     }
 }
 
@@ -63,7 +65,7 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
         return new PlaceBidCommand.Response
         {
             Result = OkOrError<PlaceBidError>.Ok(),
-            BidId = createdBid.BidId
+            BidId = createdBid.Id
         };
     }
 
@@ -88,7 +90,7 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
         return null;
     }
 
-    private async Task RemovePreviousBidIfExists(int auctionId, int userId)
+    private async Task RemovePreviousBidIfExists(Guid auctionId, Guid userId)
     {
         var existingBid = await bidsRepository.GetUserBidForAuction(auctionId, userId);
         if (existingBid != null && !existingBid.IsWithdrawn)

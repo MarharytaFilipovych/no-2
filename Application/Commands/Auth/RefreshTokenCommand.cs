@@ -1,17 +1,17 @@
+using Application.Api.Users;
+
 namespace Application.Commands.Auth;
 
-using Api;
 using API.System;
 using API.Users;
-using Domain.Users;
 using MediatR;
 using Utils;
 
 public class RefreshTokenCommand : IRequest<RefreshTokenCommand.Response>
 {
-    public string SessionId { get; init; }
+    public required string SessionId { get; init; }
 
-    public string RefreshToken { get; init; }
+    public required string RefreshToken { get; init; }
 
     public class Response
     {
@@ -20,9 +20,9 @@ public class RefreshTokenCommand : IRequest<RefreshTokenCommand.Response>
 
         public OkOrError<RefreshTokenError> Result { get; init; }
 
-        public string JwtToken { get; init; }
+        public string? JwtToken { get; init; }
 
-        public RefreshToken RefreshToken { get; init; }
+        public RefreshToken? RefreshToken { get; init; }
     }
 }
 
@@ -38,15 +38,12 @@ public class RefreshTokenCommandHandler(
         CancellationToken cancellationToken)
     {
         var session = await sessions.GetUserSession(request.SessionId);
-        if (session == null)
-        {
+        if (session == null) 
             return RefreshTokenCommand.Response.Error(RefreshTokenError.UnknownSession);
-        }
+        
 
-        if (session.RefreshToken != request.RefreshToken)
-        {
+        if (session.RefreshToken != request.RefreshToken) 
             return RefreshTokenCommand.Response.Error(RefreshTokenError.WrongToken);
-        }
 
         var newToken =
             jwtGenerator.GenerateJwtToken(session.UserId, new List<string>());

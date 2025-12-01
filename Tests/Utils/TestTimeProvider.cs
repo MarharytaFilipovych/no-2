@@ -1,3 +1,4 @@
+using Application.Api.Utils;
 using Application.Utils;
 
 namespace Tests.Utils;

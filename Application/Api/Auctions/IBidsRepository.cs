@@ -5,10 +5,10 @@ namespace Application.Api.Auctions;
 public interface IBidsRepository
 {
     Task<Bid> CreateBid(Bid bid);
-    Task<Bid?> GetBid(int bidId);
-    Task<List<Bid>> GetBidsByAuction(int auctionId);
-    Task<List<Bid>> GetActiveBidsByAuction(int auctionId);
-    Task<Bid?> GetUserBidForAuction(int auctionId, int userId);
-    Task<Bid?> GetHighestBidForAuction(int auctionId);
+    Task<Bid?> GetBid(Guid bidId);
+    Task<List<Bid>> GetBidsByAuction(Guid auctionId);
+    Task<List<Bid>> GetActiveBidsByAuction(Guid auctionId);
+    Task<Bid?> GetUserBidForAuction(Guid auctionId, Guid userId);
+    Task<Bid?> GetHighestBidForAuction(Guid auctionId);
     Task UpdateBid(Bid bid);
 }

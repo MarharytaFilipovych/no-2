@@ -6,45 +6,43 @@ using Domain.Auctions;
 
 public class BidsRepository : IBidsRepository
 {
-    private readonly ConcurrentDictionary<int, Bid> _bids = new();
-    private int _nextId = 1;
+    private readonly ConcurrentDictionary<Guid, Bid> _bids = new();
 
     public Task<Bid> CreateBid(Bid bid)
     {
-        var id = Interlocked.Increment(ref _nextId) - 1;
         var bidWithId = new Bid
         {
-            BidId = id,
+            Id = Guid.NewGuid(),
             AuctionId = bid.AuctionId,
             UserId = bid.UserId,
             Amount = bid.Amount,
             PlacedAt = bid.PlacedAt
         };
 
-        _bids[id] = bidWithId;
+        _bids[bidWithId.Id] = bidWithId;
         return Task.FromResult(bidWithId);
     }
 
-    public Task<Bid?> GetBid(int bidId)
+    public Task<Bid?> GetBid(Guid bidId)
     {
         _bids.TryGetValue(bidId, out var bid);
         return Task.FromResult(bid);
     }
 
-    public Task<List<Bid>> GetBidsByAuction(int auctionId) =>
+    public Task<List<Bid>> GetBidsByAuction(Guid auctionId) =>
         Task.FromResult(_bids.Values.Where(b => b.AuctionId == auctionId).ToList());
 
-    public Task<List<Bid>> GetActiveBidsByAuction(int auctionId) => 
+    public Task<List<Bid>> GetActiveBidsByAuction(Guid auctionId) => 
         Task.FromResult(_bids.Values
             .Where(b => b.AuctionId == auctionId && !b.IsWithdrawn)
             .ToList());
 
-    public Task<Bid?> GetUserBidForAuction(int auctionId, int userId) =>
+    public Task<Bid?> GetUserBidForAuction(Guid auctionId, Guid userId) =>
         Task.FromResult(_bids.Values
             .Where(b => b.AuctionId == auctionId && b.UserId == userId)
             .MaxBy(b => b.PlacedAt));
 
-    public Task<Bid?> GetHighestBidForAuction(int auctionId) =>
+    public Task<Bid?> GetHighestBidForAuction(Guid auctionId) =>
         Task.FromResult(_bids.Values
             .Where(b => b.AuctionId == auctionId && !b.IsWithdrawn)
             .OrderByDescending(b => b.Amount)
@@ -53,7 +51,7 @@ public class BidsRepository : IBidsRepository
 
     public Task UpdateBid(Bid bid)
     {
-        _bids[bid.BidId] = bid;
+        _bids[bid.Id] = bid;
         return Task.CompletedTask;
     }
 }

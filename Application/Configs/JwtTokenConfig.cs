@@ -2,7 +2,7 @@ namespace Application.Configs;
 
 public interface IJwtTokenConfig
 {
-    string Secret { get;}
+    string? Secret { get;}
     
     string Audience { get; }
         
@@ -12,9 +12,9 @@ public interface IJwtTokenConfig
 
 public class JwtTokenConfig : IJwtTokenConfig
 {
-    public string Secret { get; set; }
+    public string? Secret { get; set; }
 
-    public string Audience { get; set; }
+    public string Audience { get; set; } = string.Empty;
 
-    public string Issuer { get; set; }
+    public string Issuer { get; set; } = string.Empty;
 }

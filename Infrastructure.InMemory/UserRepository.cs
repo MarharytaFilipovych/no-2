@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using Application.Api.Users;
+
 namespace Infrastructure.InMemory;
 
 using Application.Api;
@@ -5,47 +8,38 @@ using Domain.Users;
 
 public class UserRepository : IUsersRepository
 {
-    private readonly List<UserWithPassword> users = new();
+    private readonly ConcurrentDictionary<string, UserWithPassword> _usersByEmail = new();
+    private readonly ConcurrentDictionary<Guid, UserWithPassword> _usersById = new();
 
-    public Task<bool> UserExists(string email)
-    {
-        return Task.FromResult(users.Any(user => user.Email == email));
-    }
+    public Task<bool> UserExists(string email) =>
+        Task.FromResult(_usersByEmail.ContainsKey(email));
 
-    public Task<bool> UserExists(int userId)
-    {
-        return Task.FromResult(users.Any(user => user.UserId == userId));
-    }
+    public Task<bool> UserExists(Guid userId) =>
+        Task.FromResult(_usersById.ContainsKey(userId));
 
-    public Task<string?> GetUserPassword(string email)
-    {
-        return Task.FromResult(users.FirstOrDefault(u => u.Email == email)?.HashedPassword);
-    }
+    public Task<string?> GetUserPassword(string email) =>
+        Task.FromResult(_usersByEmail.TryGetValue(email, out var user) ? user.HashedPassword : null);
 
-    public Task<User?> GetUser(string email)
-    {
-        return Task.FromResult<User?>(users.FirstOrDefault(u => u.Email == email));
-    }
+    public Task<User?> GetUser(string email) =>
+        Task.FromResult<User?>(_usersByEmail.TryGetValue(email, out var user) ? user : null);
 
     public Task<User?> CreateUser(string email, string hashedPassword)
     {
-        var user = new UserWithPassword() { UserId = GetNextUserId(), HashedPassword = hashedPassword, Email = email};
-        users.Add(user);
+        var user = new UserWithPassword 
+        { 
+            UserId = Guid.NewGuid(), 
+            HashedPassword = hashedPassword, 
+            Email = email 
+        };
+        
+        _usersByEmail.TryAdd(email, user);
+        _usersById.TryAdd(user.UserId, user);
+        
         return Task.FromResult<User?>(user);
-    }
-
-    private int GetNextUserId()
-    {
-        if (!users.Any())
-        {
-            return 1;
-        }
-
-        return users.Max(user => user.UserId) + 1;
     }
 }
 
 class UserWithPassword : User
 {
-    public string HashedPassword { get; init; }
+    public required string HashedPassword { get; init; }
 }

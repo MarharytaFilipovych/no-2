@@ -31,7 +31,7 @@ public class CreateAuctionValidationTests
 
         // Assert
         Assert.That(result.Result.IsOk, Is.True);
-        Assert.That(result.AuctionId, Is.GreaterThan(0));
+        Assert.NotNull(result.AuctionId);
     }
 
     [Test]

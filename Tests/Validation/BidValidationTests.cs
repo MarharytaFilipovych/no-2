@@ -26,12 +26,13 @@ public class BidValidationTests
     {
         // Arrange
         var auction = await CreateActiveOpenAuction(minPrice: 100, increment: 10);
-        await PlaceInitialBid(auction.AuctionId, userId: 1, amount: 120);
+        var userId2 = Guid.NewGuid();
+        await PlaceInitialBid(auction.Id, userId: Guid.NewGuid(), amount: 120);
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 2,
+            AuctionId = auction.Id,
+            UserId = userId2,
             Amount = 125
         };
 
@@ -48,12 +49,13 @@ public class BidValidationTests
     {
         // Arrange
         var auction = await CreateActiveOpenAuction(minPrice: 100, increment: 10);
-        await PlaceInitialBid(auction.AuctionId, userId: 1, amount: 120);
+        var userId2 = Guid.NewGuid();
+        await PlaceInitialBid(auction.Id, userId: Guid.NewGuid(), amount: 120);
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 2,
+            AuctionId = auction.Id,
+            UserId = userId2,
             Amount = 130
         };
 
@@ -72,8 +74,8 @@ public class BidValidationTests
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = Guid.NewGuid(),
             Amount = 105
         };
 
@@ -91,17 +93,18 @@ public class BidValidationTests
         // Arrange
         var auction = await CreateActiveOpenAuction(minPrice: 100, increment: 10);
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
+        var userId = Guid.NewGuid();
         var firstBid = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = userId,
             Amount = 110
         };
         await handler.Handle(firstBid, CancellationToken.None);
         var secondBid = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = userId,
             Amount = 130
         };
 
@@ -120,8 +123,8 @@ public class BidValidationTests
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = Guid.NewGuid(),
             Amount = 50
         };
 
@@ -137,12 +140,13 @@ public class BidValidationTests
     {
         // Arrange
         var auction = await CreateActiveBlindAuction(minPrice: 100);
-        await PlaceInitialBid(auction.AuctionId, userId: 1, amount: 120);
+        var userId = Guid.NewGuid();
+        await PlaceInitialBid(auction.Id, userId: userId, amount: 120);
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = userId,
             Amount = 150
         };
 
@@ -159,14 +163,15 @@ public class BidValidationTests
     {
         // Arrange
         var auction = await CreateActiveBlindAuction(minPrice: 100);
-        var firstBid = await PlaceInitialBid(auction.AuctionId, userId: 1, amount: 120);
+        var userId = Guid.NewGuid();
+        var firstBid = await PlaceInitialBid(auction.Id, userId: userId, amount: 120);
         firstBid.Withdraw();
         await _bidsRepository.UpdateBid(firstBid);
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = userId,
             Amount = 150
         };
 
@@ -193,8 +198,8 @@ public class BidValidationTests
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = Guid.NewGuid(),
             Amount = 120
         };
 
@@ -213,8 +218,8 @@ public class BidValidationTests
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = 999,
-            UserId = 1,
+            AuctionId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
             Amount = 120
         };
 
@@ -246,8 +251,8 @@ public class BidValidationTests
         var handler = new PlaceBidCommandHandler(_auctionsRepository, _bidsRepository, _timeProvider);
         var command = new PlaceBidCommand
         {
-            AuctionId = auction.AuctionId,
-            UserId = 1,
+            AuctionId = auction.Id,
+            UserId = Guid.NewGuid(),
             Amount = 110
         };
 
@@ -255,7 +260,7 @@ public class BidValidationTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        var updatedAuction = await _auctionsRepository.GetAuction(auction.AuctionId);
+        var updatedAuction = await _auctionsRepository.GetAuction(auction.Id);
         Assert.NotNull(updatedAuction);
         Assert.That(updatedAuction!.EndTime, Is.GreaterThan(originalEndTime));
     }
@@ -291,7 +296,7 @@ public class BidValidationTests
         return auction;
     }
 
-    private async Task<Bid> PlaceInitialBid(int auctionId, int userId, decimal amount)
+    private async Task<Bid> PlaceInitialBid(Guid auctionId, Guid userId, decimal amount)
     {
         return await _bidsRepository.CreateBid(new Bid
         {

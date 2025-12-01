@@ -1,4 +1,4 @@
-namespace Application.Utils;
+namespace Application.Api.Utils;
 
 public interface ITimeProvider
 {

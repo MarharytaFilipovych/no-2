@@ -45,9 +45,9 @@ public class BidWithdrawalTests
     {
         return new Bid
         {
-            BidId = 1,
-            AuctionId = 1,
-            UserId = 1,
+            Id = Guid.NewGuid(),
+            AuctionId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
             Amount = 100,
             PlacedAt = DateTime.UtcNow
         };

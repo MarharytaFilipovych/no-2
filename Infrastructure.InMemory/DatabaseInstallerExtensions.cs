@@ -1,4 +1,5 @@
 using Application.Api.Auctions;
+using Application.Api.Users;
 
 namespace Infrastructure.InMemory;
 

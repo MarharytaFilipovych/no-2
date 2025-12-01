@@ -1,4 +1,5 @@
 using Application.Api.Auctions;
+using Application.Api.Utils;
 using Application.Utils;
 using Domain.Auctions;
 using MediatR;
@@ -21,7 +22,7 @@ public class CreateAuctionCommand : IRequest<CreateAuctionCommand.Response>
     public class Response
     {
         public OkOrError<CreateAuctionError> Result { get; init; }
-        public int AuctionId { get; init; }
+        public Guid AuctionId { get; init; }
     }
 }
 
@@ -73,7 +74,7 @@ public class CreateAuctionCommandHandler(IAuctionsRepository auctionsRepository,
         return new CreateAuctionCommand.Response
         {
             Result = OkOrError<CreateAuctionError>.Ok(),
-            AuctionId = created.AuctionId
+            AuctionId = created.Id
         };
     }
 

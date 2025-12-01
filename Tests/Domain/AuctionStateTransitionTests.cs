@@ -9,15 +9,7 @@ public class AuctionStateTransitionTests
     public void NewAuction_ShouldBeInPendingState()
     {
         // Arrange & Act
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Assert
         Assert.That(auction.State, Is.EqualTo(AuctionState.Pending));
@@ -27,15 +19,7 @@ public class AuctionStateTransitionTests
     public void CanTransitionToActive_WhenInPendingStateAndNoStartTime_ShouldReturnTrue()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Act
         var result = auction.CanTransitionToActive(DateTime.UtcNow);
@@ -48,17 +32,7 @@ public class AuctionStateTransitionTests
     public void CanTransitionToActive_WhenInPendingStateAndStartTimeReached_ShouldReturnTrue()
     {
         // Arrange
-        var startTime = DateTime.UtcNow.AddMinutes(-5);
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            StartTime = startTime,
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(startTime: DateTime.UtcNow.AddMinutes(-5));
 
         // Act
         var result = auction.CanTransitionToActive(DateTime.UtcNow);
@@ -71,17 +45,7 @@ public class AuctionStateTransitionTests
     public void CanTransitionToActive_WhenInPendingStateButStartTimeNotReached_ShouldReturnFalse()
     {
         // Arrange
-        var startTime = DateTime.UtcNow.AddMinutes(10);
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            StartTime = startTime,
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(startTime: DateTime.UtcNow.AddMinutes(10));
 
         // Act
         var result = auction.CanTransitionToActive(DateTime.UtcNow);
@@ -94,15 +58,7 @@ public class AuctionStateTransitionTests
     public void TransitionToActive_WhenInPendingState_ShouldSucceed()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Act
         auction.TransitionToActive();
@@ -115,15 +71,7 @@ public class AuctionStateTransitionTests
     public void TransitionToActive_WhenNotInPendingState_ShouldThrowException()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
         auction.TransitionToActive();
 
         // Act & Assert
@@ -134,15 +82,7 @@ public class AuctionStateTransitionTests
     public void IsActive_WhenInActiveStateAndBeforeEndTime_ShouldReturnTrue()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
         auction.TransitionToActive();
 
         // Act
@@ -156,15 +96,7 @@ public class AuctionStateTransitionTests
     public void IsActive_WhenInActiveStateButAfterEndTime_ShouldReturnFalse()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-10),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-10));
         auction.TransitionToActive();
 
         // Act
@@ -178,15 +110,7 @@ public class AuctionStateTransitionTests
     public void CanTransitionToEnded_WhenActiveAndEndTimeReached_ShouldReturnTrue()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
         auction.TransitionToActive();
 
         // Act
@@ -200,15 +124,7 @@ public class AuctionStateTransitionTests
     public void CanTransitionToEnded_WhenNotActive_ShouldReturnFalse()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
 
         // Act
         var result = auction.CanTransitionToEnded(DateTime.UtcNow);
@@ -221,15 +137,7 @@ public class AuctionStateTransitionTests
     public void TransitionToEnded_WhenInActiveState_ShouldSucceed()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
         auction.TransitionToActive();
 
         // Act
@@ -243,15 +151,7 @@ public class AuctionStateTransitionTests
     public void TransitionToEnded_WhenNotInActiveState_ShouldThrowException()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() => auction.TransitionToEnded());
@@ -261,15 +161,7 @@ public class AuctionStateTransitionTests
     public void CanFinalize_WhenInEndedState_ShouldReturnTrue()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
         auction.TransitionToActive();
         auction.TransitionToEnded();
 
@@ -284,15 +176,7 @@ public class AuctionStateTransitionTests
     public void CanFinalize_WhenNotInEndedState_ShouldReturnFalse()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
         auction.TransitionToActive();
 
         // Act
@@ -306,24 +190,17 @@ public class AuctionStateTransitionTests
     public void Finalize_WhenInEndedState_ShouldSucceed()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var winnerId = Guid.NewGuid();
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
         auction.TransitionToActive();
         auction.TransitionToEnded();
 
         // Act
-        auction.Finalize(winnerId: 42, winningAmount: 500m);
+        auction.Finalize(winnerId: winnerId, winningAmount: 500m);
 
         // Assert
         Assert.That(auction.State, Is.EqualTo(AuctionState.Finalized));
-        Assert.That(auction.WinnerId, Is.EqualTo(42));
+        Assert.That(auction.WinnerId, Is.EqualTo(winnerId));
         Assert.That(auction.WinningBidAmount, Is.EqualTo(500m));
     }
 
@@ -331,15 +208,7 @@ public class AuctionStateTransitionTests
     public void Finalize_WithNoWinner_ShouldSucceed()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddMinutes(-5),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: DateTime.UtcNow.AddMinutes(-5));
         auction.TransitionToActive();
         auction.TransitionToEnded();
 
@@ -356,19 +225,11 @@ public class AuctionStateTransitionTests
     public void Finalize_WhenNotInEndedState_ShouldThrowException()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
         auction.TransitionToActive();
 
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => auction.Finalize(42, 500m));
+        Assert.Throws<InvalidOperationException>(() => auction.Finalize(Guid.NewGuid(), 500m));
     }
 
     [Test]
@@ -376,15 +237,7 @@ public class AuctionStateTransitionTests
     {
         // Arrange
         var originalEndTime = DateTime.UtcNow.AddHours(1);
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = originalEndTime,
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction(endTime: originalEndTime);
         auction.TransitionToActive();
 
         // Act
@@ -398,15 +251,7 @@ public class AuctionStateTransitionTests
     public void ExtendEndTime_WhenNotInActiveState_ShouldThrowException()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() => auction.ExtendEndTime(TimeSpan.FromMinutes(5)));
@@ -416,15 +261,7 @@ public class AuctionStateTransitionTests
     public void StateTransitionSequence_FromPendingToFinalized_ShouldSucceed()
     {
         // Arrange
-        var auction = new Auction
-        {
-            AuctionId = 1,
-            Title = "Test Auction",
-            EndTime = DateTime.UtcNow.AddHours(1),
-            Type = AuctionType.Open,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        };
+        var auction = CreateAuction();
 
         // Act & Assert
         Assert.That(auction.State, Is.EqualTo(AuctionState.Pending));
@@ -435,7 +272,26 @@ public class AuctionStateTransitionTests
         auction.TransitionToEnded();
         Assert.That(auction.State, Is.EqualTo(AuctionState.Ended));
 
-        auction.Finalize(42, 500m);
+        auction.Finalize(Guid.NewGuid(), 500m);
         Assert.That(auction.State, Is.EqualTo(AuctionState.Finalized));
+    }
+    
+    private static Auction CreateAuction(
+        DateTime? endTime = null,
+        DateTime? startTime = null,
+        AuctionType type = AuctionType.Open,
+        decimal minPrice = 100,
+        TieBreakingPolicy tieBreaking = TieBreakingPolicy.Earliest)
+    {
+        return new Auction
+        {
+            Id = Guid.NewGuid(),
+            Title = "Test Auction",
+            StartTime = startTime,
+            EndTime = endTime ?? DateTime.UtcNow.AddHours(1),
+            Type = type,
+            MinPrice = minPrice,
+            TieBreakingPolicy = tieBreaking
+        };
     }
 }

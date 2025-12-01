@@ -6,10 +6,9 @@ using Domain.Auctions;
 
 public class AuctionsRepository : IAuctionsRepository
 {
-    private readonly ConcurrentDictionary<int, Auction> _auctions = new();
-    private int _nextId = 1;
+    private readonly ConcurrentDictionary<Guid, Auction> _auctions = new();
 
-    public Task<Auction?> GetAuction(int auctionId)
+    public Task<Auction?> GetAuction(Guid auctionId)
     {
         _auctions.TryGetValue(auctionId, out var auction);
         return Task.FromResult(auction);
@@ -17,10 +16,9 @@ public class AuctionsRepository : IAuctionsRepository
 
     public Task<Auction> CreateAuction(Auction auction)
     {
-        var id = Interlocked.Increment(ref _nextId) - 1;
         var auctionWithId = new Auction
         {
-            AuctionId = id,
+            Id = Guid.NewGuid(),
             Title = auction.Title,
             Description = auction.Description,
             StartTime = auction.StartTime,
@@ -33,13 +31,13 @@ public class AuctionsRepository : IAuctionsRepository
             TieBreakingPolicy = auction.TieBreakingPolicy
         };
 
-        _auctions[id] = auctionWithId;
+        _auctions[auctionWithId.Id] = auctionWithId;
         return Task.FromResult(auctionWithId);
     }
 
     public Task UpdateAuction(Auction auction)
     {
-        _auctions[auction.AuctionId] = auction;
+        _auctions[auction.Id] = auction;
         return Task.CompletedTask;
     }
 

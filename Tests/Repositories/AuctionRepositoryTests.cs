@@ -38,18 +38,18 @@ public class AuctionRepositoryTests
         var auction = await CreateAuction(AuctionState.Pending);
 
         // Act
-        var retrieved = await _auctionsRepository.GetAuction(auction.AuctionId);
+        var retrieved = await _auctionsRepository.GetAuction(auction.Id);
 
         // Assert
         Assert.That(retrieved, Is.Not.Null);
-        Assert.That(retrieved!.AuctionId, Is.EqualTo(auction.AuctionId));
+        Assert.That(retrieved!.Id, Is.EqualTo(auction.Id));
     }
 
     [Test]
     public async Task GetAuction_WhenNotExists_ShouldReturnNull()
     {
         // Act
-        var retrieved = await _auctionsRepository.GetAuction(999);
+        var retrieved = await _auctionsRepository.GetAuction(Guid.NewGuid());
         
         // Assert
         Assert.That(retrieved, Is.Null);
@@ -66,7 +66,7 @@ public class AuctionRepositoryTests
         await _auctionsRepository.UpdateAuction(auction);
 
         // Assert
-        var retrieved = await _auctionsRepository.GetAuction(auction.AuctionId);
+        var retrieved = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(retrieved!.State, Is.EqualTo(AuctionState.Active));
     }
 
@@ -96,7 +96,7 @@ public class AuctionRepositoryTests
             case AuctionState.Finalized:
                 auction.TransitionToActive();
                 auction.TransitionToEnded();
-                auction.Finalize(1, 150m);
+                auction.Finalize(Guid.NewGuid(), 150m);
                 await _auctionsRepository.UpdateAuction(auction);
                 break;
             case AuctionState.Pending:

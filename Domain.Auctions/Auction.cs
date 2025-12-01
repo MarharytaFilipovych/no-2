@@ -2,7 +2,7 @@
 
 public class Auction
 {
-    public int AuctionId { get; init; }
+    public Guid Id { get; init; }
     public required string Title { get; init; }
     public string? Description { get; init; }
     public DateTime? StartTime { get; init; }
@@ -14,7 +14,7 @@ public class Auction
     public bool ShowMinPrice { get; init; }
     public TieBreakingPolicy TieBreakingPolicy { get; init; } = TieBreakingPolicy.Earliest;
     public AuctionState State { get; private set; } = AuctionState.Pending;
-    public int? WinnerId { get; private set; }
+    public Guid? WinnerId { get; private set; }
     public decimal? WinningBidAmount { get; private set; }
 
     public bool IsActive(DateTime currentTime) => 
@@ -48,7 +48,7 @@ public class Auction
 
     public bool CanFinalize() => State == AuctionState.Ended;
 
-    public void Finalize(int? winnerId, decimal? winningAmount)
+    public void Finalize(Guid? winnerId, decimal? winningAmount)
     {
         if (!CanFinalize())
             throw new InvalidOperationException("Can only finalize after auction has ended!");

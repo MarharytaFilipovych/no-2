@@ -2,7 +2,7 @@ namespace Application.API.Users;
 
 public interface ISessionsRepository
 {
-    Task<List<UserSession>> GetActiveSessions(int user);
+    Task<List<UserSession>> GetActiveSessions(Guid user);
 
     Task DropSession(string sessionId);
     
@@ -21,5 +21,5 @@ public class UserSession
     
     public string RefreshToken { get; init; }
     
-    public int UserId { get; init; }
+    public Guid UserId { get; init; }
 }

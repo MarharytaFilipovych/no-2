@@ -22,14 +22,15 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
+        var userId = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: userId, amount: 150);
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
-        Assert.That(highestBid!.UserId, Is.EqualTo(1));
+        Assert.That(highestBid!.UserId, Is.EqualTo(userId));
         Assert.That(highestBid.Amount, Is.EqualTo(150));
     }
 
@@ -38,16 +39,17 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
-        await PlaceBid(auction.AuctionId, userId: 2, amount: 200);
-        await PlaceBid(auction.AuctionId, userId: 3, amount: 175);
+        var userId2 = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 150);
+        await PlaceBid(auction.Id, userId: userId2, amount: 200);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 175);
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
-        Assert.That(highestBid!.UserId, Is.EqualTo(2));
+        Assert.That(highestBid!.UserId, Is.EqualTo(userId2));
         Assert.That(highestBid.Amount, Is.EqualTo(200));
     }
 
@@ -60,16 +62,17 @@ public class WinnerSelectionTests
             tieBreaking: TieBreakingPolicy.Earliest
         );
         var time = DateTime.UtcNow;
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 200, placedAt: time);
-        await PlaceBid(auction.AuctionId, userId: 2, amount: 200, placedAt: time.AddMinutes(1));
-        await PlaceBid(auction.AuctionId, userId: 3, amount: 200, placedAt: time.AddMinutes(2));
+        var userId1 = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: userId1, amount: 200, placedAt: time);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 200, placedAt: time.AddMinutes(1));
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 200, placedAt: time.AddMinutes(2));
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
-        Assert.That(highestBid!.UserId, Is.EqualTo(1));
+        Assert.That(highestBid!.UserId, Is.EqualTo(userId1));
     }
 
     [Test]
@@ -77,11 +80,11 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 500);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
-        await PlaceBid(auction.AuctionId, userId: 2, amount: 200);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 150);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 200);
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
@@ -93,19 +96,20 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
-        var withdrawnBid = await PlaceBid(auction.AuctionId, userId: 2, amount: 200);
-        await PlaceBid(auction.AuctionId, userId: 3, amount: 175);
+        var userId3 = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 150);
+        var withdrawnBid = await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 200);
+        await PlaceBid(auction.Id, userId: userId3, amount: 175);
 
         withdrawnBid.Withdraw();
         await _bidsRepository.UpdateBid(withdrawnBid);
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
-        Assert.That(highestBid!.UserId, Is.EqualTo(3));
+        Assert.That(highestBid!.UserId, Is.EqualTo(userId3));
         Assert.That(highestBid.Amount, Is.EqualTo(175));
     }
 
@@ -114,16 +118,17 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedBlindAuction(minPrice: 100);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 50);
-        await PlaceBid(auction.AuctionId, userId: 2, amount: 200);
-        await PlaceBid(auction.AuctionId, userId: 3, amount: 150);
+        var userId2 = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 50);
+        await PlaceBid(auction.Id, userId: userId2, amount: 200);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 150);
 
         // Act
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Assert
         Assert.That(highestBid, Is.Not.Null);
-        Assert.That(highestBid!.UserId, Is.EqualTo(2));
+        Assert.That(highestBid!.UserId, Is.EqualTo(userId2));
         Assert.That(highestBid.Amount, Is.EqualTo(200));
     }
 
@@ -132,17 +137,18 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
-        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.AuctionId);
+        var userId = Guid.NewGuid();
+        await PlaceBid(auction.Id, userId: userId, amount: 150);
+        var highestBid = await _bidsRepository.GetHighestBidForAuction(auction.Id);
 
         // Act
         auction.Finalize(highestBid!.UserId, highestBid.Amount);
         await _auctionsRepository.UpdateAuction(auction);
 
         // Assert
-        var finalized = await _auctionsRepository.GetAuction(auction.AuctionId);
+        var finalized = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(finalized!.State, Is.EqualTo(AuctionState.Finalized));
-        Assert.That(finalized.WinnerId, Is.EqualTo(1));
+        Assert.That(finalized.WinnerId, Is.EqualTo(userId));
         Assert.That(finalized.WinningBidAmount, Is.EqualTo(150));
     }
 
@@ -151,14 +157,14 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 500);
-        await PlaceBid(auction.AuctionId, userId: 1, amount: 150);
+        await PlaceBid(auction.Id, userId: Guid.NewGuid(), amount: 150);
 
         // Act
         auction.Finalize(winnerId: null, winningAmount: null);
         await _auctionsRepository.UpdateAuction(auction);
 
         // Assert
-        var finalized = await _auctionsRepository.GetAuction(auction.AuctionId);
+        var finalized = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(finalized!.State, Is.EqualTo(AuctionState.Finalized));
         Assert.That(finalized.WinnerId, Is.Null);
         Assert.That(finalized.WinningBidAmount, Is.Null);
@@ -172,7 +178,7 @@ public class WinnerSelectionTests
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() => 
-            auction.Finalize(winnerId: 1, winningAmount: 150));
+            auction.Finalize(winnerId: Guid.NewGuid(), winningAmount: 150));
     }
 
     [Test]
@@ -180,11 +186,11 @@ public class WinnerSelectionTests
     {
         // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
-        auction.Finalize(winnerId: 1, winningAmount: 150);
+        auction.Finalize(winnerId: Guid.NewGuid(), winningAmount: 150);
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() => 
-            auction.Finalize(winnerId: 2, winningAmount: 200));
+            auction.Finalize(winnerId: Guid.NewGuid(), winningAmount: 200));
     }
 
     private async Task<Auction> CreateActiveAuction()
@@ -239,8 +245,8 @@ public class WinnerSelectionTests
     }
 
     private async Task<Bid> PlaceBid(
-        int auctionId,
-        int userId,
+        Guid auctionId,
+        Guid userId,
         decimal amount,
         DateTime? placedAt = null)
     {

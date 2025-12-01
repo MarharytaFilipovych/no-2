@@ -1,6 +1,7 @@
+using Application.Api.Users;
+
 namespace Application.Commands.Auth;
 
-using Api;
 using API.System;
 using API.Users;
 using BCrypt.Net;
@@ -8,9 +9,9 @@ using MediatR;
 
 public class LoginCommand : IRequest<LoginCommand.Response>
 {
-    public string Email { get; init; }
+    public required string Email { get; init; }
 
-    public string Password { get; init; }
+    public required string Password { get; init; }
 
     public string? SessionId { get; init; }
 
@@ -18,11 +19,11 @@ public class LoginCommand : IRequest<LoginCommand.Response>
     {
         public bool UserLoggedIn { get; init; }
 
-        public string JwtToken { get; init; }
+        public string? JwtToken { get; init; }
 
-        public string SessionId { get; init; }
+        public string? SessionId { get; init; }
 
-        public RefreshToken RefreshToken { get; init; }
+        public RefreshToken? RefreshToken { get; init; }
     }
 }
 
@@ -39,24 +40,20 @@ public class LoginCommandHandler(
     public async Task<LoginCommand.Response> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var pass = await usersRepository.GetUserPassword(request.Email);
-        if (pass == null || !BCrypt.Verify(request.Password, pass))
-        {
+        if (pass == null || !BCrypt.Verify(request.Password, pass)) 
             return new LoginCommand.Response { UserLoggedIn = false };
-        }
 
         var user = await usersRepository.GetUser(request.Email);
         if (user == null)
         {
-            return new LoginCommand.Response()
+            return new LoginCommand.Response
             {
                 UserLoggedIn = false
             };
         }
 
-        if (request.SessionId != null)
-        {
+        if (request.SessionId != null) 
             await sessions.DropSession(request.SessionId);
-        }
 
         var activeSessions = await sessions.GetActiveSessions(user.UserId);
         if (activeSessions.Count == MaxConcurrentSessions)

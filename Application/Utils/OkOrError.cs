@@ -2,26 +2,25 @@ namespace Application.Utils;
 
 public readonly struct OkOrError<TError>
 {
-    private readonly TError error;
-    private readonly bool isError;
+    private readonly TError _error;
+    private readonly bool _isError;
 
-    public bool IsOk => !isError;
-    public bool IsError => isError;
+    public bool IsOk => !_isError;
+    public bool IsError => _isError;
 
-    public TError GetError() => isError ? error : throw new InvalidOperationException("No error available");
+    public TError GetError() => _isError ? _error : 
+        throw new InvalidOperationException("No error available");
 
     private OkOrError(TError error, bool isError)
     {
-        this.error = error;
-        this.isError = isError;
+        _error = error;
+        _isError = isError;
     }
 
-    public static OkOrError<TError> Ok() => new OkOrError<TError>(default!, false);
+    public static OkOrError<TError> Ok() => new(default!, false);
 
-    public static OkOrError<TError> Error(TError error) => new OkOrError<TError>(error, true);
+    public static OkOrError<TError> Error(TError error) => new(error, true);
 
-    public override string ToString()
-    {
-        return IsOk ? "IsOk" : error.ToString();
-    }
+    public override string ToString() => 
+        IsOk ? "IsOk" : _error.ToString();
 }
