@@ -1,12 +1,11 @@
-using Domain.Auctions;
-
-namespace Tests.Validation;
-
 using Application.Api.Auctions;
 using Application.Commands.Auctions;
+using Application.Validators.Auctions;
+using Domain.Auctions;
 using Infrastructure.InMemory;
-using Utils;
+using Tests.Utils;
 
+namespace Tests.Validation;
 
 [TestFixture]
 public class BidWithdrawalCommandTests
@@ -30,7 +29,7 @@ public class BidWithdrawalCommandTests
         var auction = await CreateActiveAuction();
         var userId = Guid.NewGuid();
         var bid = await PlaceBid(auction.Id, userId, 150);
-        var handler = new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = new WithdrawBidCommand
         {
             BidId = bid.Id,
@@ -53,7 +52,7 @@ public class BidWithdrawalCommandTests
         var auction = await CreateEndedAuction();
         var userId = Guid.NewGuid();
         var bid = await PlaceBid(auction.Id, userId, 150);
-        var handler = new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = new WithdrawBidCommand
         {
             BidId = bid.Id,
@@ -75,7 +74,7 @@ public class BidWithdrawalCommandTests
         var auction = await CreateActiveAuction();
         var userId = Guid.NewGuid();
         var bid = await PlaceBid(auction.Id, userId, 150);
-        var handler = new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = new WithdrawBidCommand
         {
             BidId = bid.Id,
@@ -99,7 +98,7 @@ public class BidWithdrawalCommandTests
         var bid = await PlaceBid(auction.Id, userId, 150);
         bid.Withdraw();
         await _bidsRepository.UpdateBid(bid);
-        var handler = new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = new WithdrawBidCommand
         {
             BidId = bid.Id,
@@ -118,7 +117,7 @@ public class BidWithdrawalCommandTests
     public async Task WithdrawBid_NonExistentBid_ShouldFail()
     {
         // Arrange
-        var handler = new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = new WithdrawBidCommand
         {
             BidId = Guid.NewGuid(),
@@ -189,6 +188,18 @@ public class BidWithdrawalCommandTests
 
         // Assert
         Assert.That(canWithdraw, Is.False);
+    }
+
+    private WithdrawBidCommandHandler CreateHandler()
+    {
+        var validators = new List<IWithdrawBidValidator>
+        {
+            new BidOwnershipValidator(),
+            new BidNotAlreadyWithdrawnValidator(),
+            new AuctionActiveForWithdrawalValidator()
+        };
+
+        return new WithdrawBidCommandHandler(_bidsRepository, _auctionsRepository, _timeProvider, validators);
     }
 
     private async Task<Auction> CreateActiveAuction()

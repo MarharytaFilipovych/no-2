@@ -1,6 +1,6 @@
 using Application.Api.Auctions;
 using Application.Commands.Auctions;
-using Application.Configs;
+using Application.Validators.Auctions;
 using Domain.Auctions;
 using Infrastructure.InMemory;
 using Tests.Utils;
@@ -29,7 +29,7 @@ public class BidValidationTests
             BalanceRatioLimit = 0.5m
         };
     }
-    
+
     [Test]
     public async Task PlaceBid_OnOpenAuction_WhenBidTooLow_ShouldFail()
     {
@@ -252,7 +252,7 @@ public class BidValidationTests
         Assert.That(result.Result.IsError, Is.True);
         Assert.That(result.Result.GetError(), Is.EqualTo(PlaceBidError.AuctionNotFound));
     }
-    
+
     [Test]
     public async Task PlaceBid_WithSoftClose_ShouldExtendAuction()
     {
@@ -288,7 +288,7 @@ public class BidValidationTests
         Assert.NotNull(updatedAuction);
         Assert.That(updatedAuction!.EndTime, Is.GreaterThan(originalEndTime));
     }
-    
+
     [Test]
     public async Task PlaceBid_ExceedsMaxBidAmount_ShouldFail()
     {
@@ -433,15 +433,21 @@ public class BidValidationTests
             MaxBidAmount = 1000000,
             BalanceRatioLimit = 2.0m
         };
+        var validators = new List<IBidValidator>
+        {
+            new MaxBidAmountValidator(customConfig),
+            new BalanceRatioValidator(customConfig, _balanceRepository),
+            new OpenAuctionIncrementValidator(_bidsRepository),
+            new BlindAuctionSingleBidValidator(_bidsRepository)
+        };
         var auction = await CreateActiveBlindAuction(minPrice: 100);
         var userId = Guid.NewGuid();
         await SetupUserBalance(userId, 500);
         var handler = new PlaceBidCommandHandler(
-            _auctionsRepository, 
-            _bidsRepository, 
-            _timeProvider, 
-            customConfig, 
-            _balanceRepository);
+            _auctionsRepository,
+            _bidsRepository,
+            _timeProvider,
+            validators);
         var command = new PlaceBidCommand
         {
             AuctionId = auction.Id,
@@ -478,7 +484,7 @@ public class BidValidationTests
         Assert.That(result.Result.IsError, Is.True);
         Assert.That(result.Result.GetError(), Is.EqualTo(PlaceBidError.ExceedsMaxBidAmount));
     }
-    
+
     private async Task<Auction> CreateActiveOpenAuction(decimal minPrice, decimal increment)
     {
         var auction = await _auctionsRepository.CreateAuction(new Auction
@@ -526,13 +532,20 @@ public class BidValidationTests
         await _balanceRepository.DepositFunds(userId, amount);
     }
 
-    private PlaceBidCommandHandler CreateHandler() =>
-        new(_auctionsRepository, _bidsRepository, _timeProvider, _biddingConfig, _balanceRepository);
+    private PlaceBidCommandHandler CreateHandler()
+    {
+        var validators = new List<IBidValidator>
+        {
+            new MaxBidAmountValidator(_biddingConfig),
+            new BalanceRatioValidator(_biddingConfig, _balanceRepository),
+            new OpenAuctionIncrementValidator(_bidsRepository),
+            new BlindAuctionSingleBidValidator(_bidsRepository)
+        };
 
-}
-
-public class TestBiddingConfig : IBiddingConfig
-{
-    public decimal MaxBidAmount { get; set; }
-    public decimal BalanceRatioLimit { get; set; }
+        return new PlaceBidCommandHandler(
+            _auctionsRepository,
+            _bidsRepository,
+            _timeProvider,
+            validators);
+    }
 }
