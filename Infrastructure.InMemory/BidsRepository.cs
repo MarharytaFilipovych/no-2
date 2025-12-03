@@ -10,17 +10,11 @@ public class BidsRepository : IBidsRepository
 
     public Task<Bid> CreateBid(Bid bid)
     {
-        var bidWithId = new Bid
-        {
-            Id = Guid.NewGuid(),
-            AuctionId = bid.AuctionId,
-            UserId = bid.UserId,
-            Amount = bid.Amount,
-            PlacedAt = bid.PlacedAt
-        };
-
-        _bids[bidWithId.Id] = bidWithId;
-        return Task.FromResult(bidWithId);
+        if (bid.Id == Guid.Empty)
+            bid.Id = Guid.NewGuid();
+    
+        _bids[bid.Id] = bid;
+        return Task.FromResult(bid);
     }
 
     public Task<Bid?> GetBid(Guid bidId)

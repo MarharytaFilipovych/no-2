@@ -16,23 +16,11 @@ public class AuctionsRepository : IAuctionsRepository
 
     public Task<Auction> CreateAuction(Auction auction)
     {
-        var auctionWithId = new Auction
-        {
-            Id = Guid.NewGuid(),
-            Title = auction.Title,
-            Description = auction.Description,
-            StartTime = auction.StartTime,
-            EndTime = auction.EndTime,
-            Type = auction.Type,
-            MinimumIncrement = auction.MinimumIncrement,
-            MinPrice = auction.MinPrice,
-            SoftCloseWindow = auction.SoftCloseWindow,
-            ShowMinPrice = auction.ShowMinPrice,
-            TieBreakingPolicy = auction.TieBreakingPolicy
-        };
-
-        _auctions[auctionWithId.Id] = auctionWithId;
-        return Task.FromResult(auctionWithId);
+        if (auction.Id == Guid.Empty)
+            auction.Id = Guid.NewGuid();
+    
+        _auctions[auction.Id] = auction;
+        return Task.FromResult(auction);
     }
 
     public Task UpdateAuction(Auction auction)
