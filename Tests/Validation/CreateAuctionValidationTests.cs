@@ -1,5 +1,6 @@
 using Application.Api.Auctions;
 using Application.Commands.Auctions;
+using Application.Validators.Auctions;
 using Domain.Auctions;
 using Infrastructure.InMemory;
 using Tests.Utils;
@@ -23,7 +24,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithValidData_ShouldSucceed()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(minimumIncrement: 10);
 
         // Act
@@ -38,7 +39,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithEmptyTitle_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(title: "", minimumIncrement: 10);
 
         // Act
@@ -53,7 +54,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithWhitespaceTitle_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(title: "   ", minimumIncrement: 10);
 
         // Act
@@ -68,7 +69,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithStartTimeAfterEndTime_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(
             startTime: _timeProvider.Now().AddHours(2),
             endTime: _timeProvider.Now().AddHours(1),
@@ -87,7 +88,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_OpenWithoutIncrement_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand();
 
         // Act
@@ -102,7 +103,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_OpenWithZeroIncrement_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(minimumIncrement: 0);
 
         // Act
@@ -117,7 +118,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_OpenWithNegativeIncrement_ShouldFail()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(minimumIncrement: -10);
 
         // Act
@@ -132,7 +133,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_BlindWithoutIncrement_ShouldSucceed()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(type: AuctionType.Blind);
 
         // Act
@@ -146,7 +147,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithoutStartTime_ShouldTransitionToActive()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(startTime: null, minimumIncrement: 10);
 
         // Act
@@ -161,7 +162,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithFutureStartTime_ShouldStayPending()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(
             startTime: _timeProvider.Now().AddHours(1),
             endTime: _timeProvider.Now().AddHours(2),
@@ -180,7 +181,7 @@ public class CreateAuctionValidationTests
     public async Task CreateAuction_WithPastStartTime_ShouldTransitionToActive()
     {
         // Arrange
-        var handler = new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider);
+        var handler = CreateHandler();
         var command = CreateCommand(
             startTime: _timeProvider.Now().AddMinutes(-10),
             minimumIncrement: 10
@@ -192,6 +193,18 @@ public class CreateAuctionValidationTests
         // Assert
         var auction = await _auctionsRepository.GetAuction(result.AuctionId);
         Assert.That(auction!.State, Is.EqualTo(AuctionState.Active));
+    }
+
+    private CreateAuctionCommandHandler CreateHandler()
+    {
+        var validators = new List<ICreateAuctionValidator>
+        {
+            new AuctionTitleValidator(),
+            new AuctionTimeRangeValidator(),
+            new OpenAuctionRequiresIncrementValidator()
+        };
+
+        return new CreateAuctionCommandHandler(_auctionsRepository, _timeProvider, validators);
     }
 
     private CreateAuctionCommand CreateCommand(

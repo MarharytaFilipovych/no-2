@@ -15,96 +15,46 @@ public class AuctionsController(IMediator mediator, IAuctionsRepository auctions
     IBidsRepository bidsRepository) : ControllerBase
 {
     [HttpPost]
-    [SwaggerResponse(StatusCodes.Status200OK, "Auction created successfully")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Auction created successfully", typeof(AuctionCreatedResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid auction data")]
     public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionRequest request)
     {
-        var command = new CreateAuctionCommand
-        {
-            Title = request.Title,
-            Description = request.Description,
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            Type = request.Type,
-            MinimumIncrement = request.MinimumIncrement,
-            MinPrice = request.MinPrice,
-            SoftCloseWindow = request.SoftCloseWindow,
-            ShowMinPrice = request.ShowMinPrice,
-            TieBreakingPolicy = request.TieBreakingPolicy
-        };
-
+        var command = MapToCommand(request);
         var result = await mediator.Send(command);
 
-        if (result.Result.IsError) 
-            return BadRequest(new { error = result.Result.GetError().ToString() });
-
-        return Ok(new { auctionId = result.AuctionId });
+        return result.Result.IsError
+            ? BadRequest(new { error = result.Result.GetError().ToString() })
+            : Ok(new AuctionCreatedResponse(result.AuctionId));
     }
 
     [HttpGet("active")]
-    [SwaggerResponse(StatusCodes.Status200OK, "Active auctions retrieved")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Active auctions retrieved", typeof(IEnumerable<AuctionListResponse>))]
     public async Task<IActionResult> GetActiveAuctions()
     {
         var auctions = await auctionsRepository.GetAuctionsByState(AuctionState.Active);
-
-        var response = auctions.Select(a => new
-        {
-            auctionId = a.Id,
-            title = a.Title,
-            description = a.Description,
-            endTime = a.EndTime,
-            type = a.Type.ToString(),
-            minPrice = a.ShowMinPrice ? a.MinPrice : (decimal?)null,
-            currentHighestBid = a.Type == AuctionType.Open 
-                ? bidsRepository.GetHighestBidForAuction(a.Id).Result?.Amount 
-                : null
-        });
-
+        var response = await MapToListResponse(auctions);
         return Ok(response);
     }
 
     [HttpGet("{auctionId}")]
-    [SwaggerResponse(StatusCodes.Status200OK, "Auction details retrieved")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Auction details retrieved", typeof(AuctionDetailsResponse))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Auction not found")]
     public async Task<IActionResult> GetAuctionDetails(Guid auctionId)
     {
         var auction = await auctionsRepository.GetAuction(auctionId);
         if (auction == null) return NotFound();
 
-        var bids = await bidsRepository.GetActiveBidsByAuction(auctionId);
-        var highestBid = await bidsRepository.GetHighestBidForAuction(auctionId);
-
-        var response = new
-        {
-            auctionId = auction.Id,
-            title = auction.Title,
-            description = auction.Description,
-            startTime = auction.StartTime,
-            endTime = auction.EndTime,
-            state = auction.State.ToString(),
-            type = auction.Type.ToString(),
-            minPrice = auction.ShowMinPrice || 
-                       auction.State == AuctionState.Ended ||
-                       auction.State == AuctionState.Finalized 
-                ? auction.MinPrice 
-                : (decimal?)null,
-            currentHighestBid = auction.Type == AuctionType.Open ? highestBid?.Amount : null,
-            bidCount = auction.Type == AuctionType.Blind ? bids.Count : (int?)null,
-            winnerId = auction.State == AuctionState.Finalized ? auction.WinnerId : null,
-            winningAmount = auction.State == AuctionState.Finalized ? auction.WinningBidAmount : null
-        };
-
+        var response = await MapToDetailsResponse(auction);
         return Ok(response);
     }
 
     [HttpPost("{auctionId}/bids"), Authorize]
-    [SwaggerResponse(StatusCodes.Status200OK, "Bid placed successfully")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Bid placed successfully", typeof(BidPlacedResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid bid")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Auction not found")]
     public async Task<IActionResult> PlaceBid(Guid auctionId, [FromBody] PlaceBidRequest request)
     {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
-
+        var userId = GetUserId();
         var command = new PlaceBidCommand
         {
             AuctionId = auctionId,
@@ -116,41 +66,88 @@ public class AuctionsController(IMediator mediator, IAuctionsRepository auctions
 
         if (result.Result.IsError)
         {
-            var error = result.Result.GetError();
-            return error switch
+            return result.Result.GetError() switch
             {
                 PlaceBidError.AuctionNotFound => NotFound(),
-                _ => BadRequest(new { error = error.ToString() })
+                _ => BadRequest(new { error = result.Result.GetError().ToString() })
             };
         }
 
-        return Ok(new { bidId = result.BidId });
+        return Ok(new BidPlacedResponse(result.BidId));
     }
 
     [HttpPost("{auctionId}/finalize")]
-    [SwaggerResponse(StatusCodes.Status200OK, "Auction finalized")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Auction finalized", typeof(AuctionFinalizedResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot finalize auction")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Auction not found")]
     public async Task<IActionResult> FinalizeAuction(Guid auctionId)
     {
         var auction = await auctionsRepository.GetAuction(auctionId);
         if (auction == null) return NotFound();
-        if (!auction.CanFinalize()) 
+
+        if (!auction.CanFinalize())
             return BadRequest(new { error = "Auction must be in Ended state to finalize" });
-        
 
         var highestBid = await bidsRepository.GetHighestBidForAuction(auctionId);
 
-        if (highestBid != null && highestBid.Amount >= auction.MinPrice) 
+        if (highestBid != null && highestBid.Amount >= auction.MinPrice)
             auction.Finalize(highestBid.UserId, highestBid.Amount);
         else auction.Finalize(null, null);
 
         await auctionsRepository.UpdateAuction(auction);
 
-        return Ok(new
-        {
-            winnerId = auction.WinnerId,
-            winningAmount = auction.WinningBidAmount
-        });
+        return Ok(new AuctionFinalizedResponse(auction.WinnerId, auction.WinningBidAmount));
     }
+
+    private static CreateAuctionCommand MapToCommand(CreateAuctionRequest request) => new()
+    {
+        Title = request.Title,
+        Description = request.Description,
+        StartTime = request.StartTime,
+        EndTime = request.EndTime,
+        Type = request.Type,
+        MinimumIncrement = request.MinimumIncrement,
+        MinPrice = request.MinPrice,
+        SoftCloseWindow = request.SoftCloseWindow,
+        ShowMinPrice = request.ShowMinPrice,
+        TieBreakingPolicy = request.TieBreakingPolicy
+    };
+
+    private async Task<IEnumerable<AuctionListResponse>> MapToListResponse(List<Auction> auctions)
+    {
+        var responseTasks = auctions.Select(async a => new AuctionListResponse(
+            a.Id, a.Title, a.Description,
+            a.EndTime, a.Type.ToString(),
+            a.ShowMinPrice ? a.MinPrice : null, a.Type == AuctionType.Open
+                ? (await bidsRepository.GetHighestBidForAuction(a.Id))?.Amount : null
+        ));
+
+        return await Task.WhenAll(responseTasks);
+    }
+
+    private async Task<AuctionDetailsResponse> MapToDetailsResponse(Auction auction)
+    {
+        var bids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
+        var highestBid = await bidsRepository.GetHighestBidForAuction(auction.Id);
+
+        return new AuctionDetailsResponse(
+            auction.Id, auction.Title,
+            auction.Description, auction.StartTime,
+            auction.EndTime, auction.State.ToString(),
+            auction.Type.ToString(),
+            ShouldShowMinPrice(auction) ? auction.MinPrice : null,
+            auction.Type == AuctionType.Open ? highestBid?.Amount : null,
+            auction.Type == AuctionType.Blind ? bids.Count : null,
+            auction.State == AuctionState.Finalized ? auction.WinnerId : null,
+            auction.State == AuctionState.Finalized ? auction.WinningBidAmount : null
+        );
+    }
+
+    private static bool ShouldShowMinPrice(Auction auction) =>
+        auction.ShowMinPrice ||
+        auction.State == AuctionState.Ended ||
+        auction.State == AuctionState.Finalized;
+
+    private Guid GetUserId() =>
+        Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
 }

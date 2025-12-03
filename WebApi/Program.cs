@@ -6,6 +6,8 @@ using Application.Api.Utils;
 using Application.Auth;
 using Application.Commands.Auth;
 using Application.Utils;
+using Application.Validators.Auctions;
+using Application.Validators.Auth;
 using Infrastructure.InMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -14,23 +16,37 @@ using Application.Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
 builder.Services.AddSingleton<ITimeProvider, UtcTimeProvider>();
+
+builder.Services.AddScoped<ICreateAuctionValidator, AuctionTitleValidator>();
+builder.Services.AddScoped<ICreateAuctionValidator, AuctionTimeRangeValidator>();
+builder.Services.AddScoped<ICreateAuctionValidator, OpenAuctionRequiresIncrementValidator>();
+
+builder.Services.AddScoped<IBidValidator, MaxBidAmountValidator>();
+builder.Services.AddScoped<IBidValidator, BalanceRatioValidator>();
+builder.Services.AddScoped<IBidValidator, OpenAuctionIncrementValidator>();
+builder.Services.AddScoped<IBidValidator, BlindAuctionSingleBidValidator>();
+
+builder.Services.AddScoped<IWithdrawBidValidator, BidOwnershipValidator>();
+builder.Services.AddScoped<IWithdrawBidValidator, BidNotAlreadyWithdrawnValidator>();
+builder.Services.AddScoped<IWithdrawBidValidator, AuctionActiveForWithdrawalValidator>();
+
+builder.Services.AddScoped<IRegisterValidator, EmailAlreadyExistsValidator>();
+builder.Services.AddScoped<ILoginValidator, UserCredentialsValidator>();
+builder.Services.AddScoped<IRefreshTokenValidator, SessionExistsValidator>();
+builder.Services.AddScoped<IRefreshTokenValidator, RefreshTokenMatchValidator>();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllForTesting",
         policy =>
         {
-            // Allow any origin during development. In production, you would
-            // replace WithOrigins("*") with a list of your specific frontend URLs
-            // e.g., .WithOrigins("https://myfrontend.com")
-            policy.SetIsOriginAllowed(_ => true) // Allows any origin
+            policy.SetIsOriginAllowed(_ => true)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials(); 
+                  .AllowCredentials();
         });
 });
 
@@ -38,7 +54,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-});;
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -50,6 +66,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Re
 builder.Services.AddPersistence();
 
 var jwtTokenConfig = builder.InstallConfigFromSection<IJwtTokenConfig, JwtTokenConfig>("JwtToken");
+builder.InstallConfigFromSection<IBiddingConfig, BiddingConfig>("BiddingConfig");
 
 builder.Services.AddAuthentication(x =>
 {
@@ -75,7 +92,6 @@ builder.Services.AddAuthentication(x =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -83,12 +99,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseCors("AllowAllForTesting");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

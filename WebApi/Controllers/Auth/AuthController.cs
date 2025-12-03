@@ -21,17 +21,11 @@ public class AuthController(IMediator mediator, IWebHostEnvironment environment)
     {
         var response = await mediator.Send(new RegisterCommand
             { Email = request.Email, Password = request.Password });
-        if (response.Status.IsError)
-        {
-            return Conflict(); //409
-        }
-
+        if (response.Status.IsError) return Conflict(); //409
+        
         UpdateRefreshTokenCookie(response.RefreshToken, response.SessionId);
 
-        return Ok(new LoginResponse
-        {
-            AccessToken = response.JwtToken
-        });
+        return Ok(new LoginResponse { AccessToken = response.JwtToken });
     }
 
     [HttpPost("login")]
@@ -41,16 +35,11 @@ public class AuthController(IMediator mediator, IWebHostEnvironment environment)
     {
         var response = await mediator.Send(new LoginCommand()
             { Email = request.Email, Password = request.Password });
-        if (!response.UserLoggedIn)
-        {
-            return BadRequest(); 
-        }
+        if (!response.UserLoggedIn) return BadRequest(); 
+        
         UpdateRefreshTokenCookie(response.RefreshToken, response.SessionId);
 
-        return Ok(new
-        {
-            AccessToken = response.JwtToken
-        });
+        return Ok(new {AccessToken = response.JwtToken });
     }
 
     [HttpPost("refresh")]
@@ -61,23 +50,20 @@ public class AuthController(IMediator mediator, IWebHostEnvironment environment)
             // This now executes when the browser refuses to send the cookie based on its security policy.
             return Forbid(); 
         }
-        if (!Request.Cookies.TryGetValue(SessionIdKey, out var sessionId))
-        {
+        if (!Request.Cookies.TryGetValue(SessionIdKey, out var sessionId)) 
             return Forbid();
-        }
+        
 
         var result = await mediator.Send(new RefreshTokenCommand
             { RefreshToken = refreshToken, SessionId = sessionId });
 
-        if (result.Result.IsError)
-        {
-            return Forbid();
-        }
+        if (result.Result.IsError) return Forbid();
+        
 
         var newRefreshToken = result.RefreshToken;
         Response.Cookies.Append(RefreshTokenKey, newRefreshToken.Value, CookieOptions(newRefreshToken.ExpirationTime));
 
-        return Ok(new LoginResponse() { AccessToken = result.JwtToken });
+        return Ok(new LoginResponse { AccessToken = result.JwtToken });
     }
 
     private CookieOptions CookieOptions(DateTime expirationTime) => new()
