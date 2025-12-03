@@ -43,14 +43,14 @@ public class PlaceBidCommandHandler(IAuctionsRepository auctionsRepository,
 
         var currentTime = timeProvider.Now();
         if (!auction.IsActive(currentTime)) return ErrorResponse(PlaceBidError.AuctionNotActive);
-
+        
+        if (auction.Type == AuctionType.Blind)
+            await RemovePreviousBidIfExists(request.AuctionId, request.UserId);
+        
         var validationError = await ValidateBid(auction, request.Amount, request.UserId);
         if (validationError != null) return ErrorResponse(validationError.Value);
 
         var bid = CreateBid(request, currentTime);
-
-        if (auction.Type == AuctionType.Blind)
-            await RemovePreviousBidIfExists(request.AuctionId, request.UserId);
 
         var createdBid = await bidsRepository.CreateBid(bid);
         await ApplySoftCloseIfNeeded(auction, currentTime);
