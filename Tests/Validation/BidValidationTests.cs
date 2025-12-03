@@ -152,13 +152,13 @@ public class BidValidationTests
     }
 
     [Test]
-    public async Task PlaceBid_OnBlindAuction_SecondBidFromSameUser_ShouldFail()
+    public async Task PlaceBid_OnBlindAuction_SecondBidFromSameUser_ShouldReplaceFirst()
     {
         // Arrange
         var auction = await CreateActiveBlindAuction(minPrice: 100);
         var userId = Guid.NewGuid();
         await SetupUserBalance(userId, 10000);
-        await PlaceInitialBid(auction.Id, userId: userId, amount: 120);
+        var firstBid = await PlaceInitialBid(auction.Id, userId: userId, amount: 120);
         var handler = CreateHandler();
         var command = new PlaceBidCommand
         {
@@ -171,8 +171,16 @@ public class BidValidationTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(PlaceBidError.UserAlreadyBid));
+        Assert.That(result.Result.IsOk, Is.True);
+    
+        // Verify
+        var withdrawnBid = await _bidsRepository.GetBid(firstBid.Id);
+        Assert.That(withdrawnBid!.IsWithdrawn, Is.True);
+    
+        var activeBids = await _bidsRepository.GetActiveBidsByAuction(auction.Id);
+        var userActiveBids = activeBids.Where(b => b.UserId == userId).ToList();
+        Assert.That(userActiveBids.Count, Is.EqualTo(1));
+        Assert.That(userActiveBids[0].Amount, Is.EqualTo(150));
     }
 
     [Test]
