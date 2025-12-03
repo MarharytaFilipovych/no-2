@@ -2,7 +2,7 @@ namespace Domain.Auctions;
 
 public class Bid
 {
-    public Guid Id { get; init; }
+    public Guid Id { get; set; } = Guid.Empty;
     public required Guid AuctionId { get; init; }
     public required Guid UserId { get; init; }
     public decimal Amount { get; init; }
