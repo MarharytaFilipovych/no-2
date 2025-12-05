@@ -25,16 +25,39 @@ public class UserRepository : IUsersRepository
 
     public Task<User?> CreateUser(string email, string hashedPassword)
     {
-        var user = new UserWithPassword 
-        { 
-            UserId = Guid.NewGuid(), 
-            HashedPassword = hashedPassword, 
-            Email = email 
+        var user = new UserWithPassword
+        {
+            UserId = Guid.NewGuid(),
+            HashedPassword = hashedPassword,
+            Email = email
         };
-        
+
         _usersByEmail.TryAdd(email, user);
         _usersById.TryAdd(user.UserId, user);
-        
+
+        return Task.FromResult<User?>(user);
+    }
+
+    public Task UpdateUser(User user)
+    {
+        if (_usersById.ContainsKey(user.UserId))
+        {
+            var userWithPassword = _usersById[user.UserId];
+            userWithPassword.BannedUntil = user.BannedUntil;
+            _usersById[user.UserId] = userWithPassword;
+
+            if (userWithPassword.Email != null)
+            {
+                _usersByEmail[userWithPassword.Email] = userWithPassword;
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<User?> GetUser(Guid userId)
+    {
+        _usersById.TryGetValue(userId, out var user);
         return Task.FromResult<User?>(user);
     }
 }

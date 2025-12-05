@@ -101,6 +101,50 @@ public class AuctionsController(
         return Ok(new AuctionFinalizedResponse(result.WinnerId, result.WinningAmount));
     }
 
+    [HttpPost("{auctionId}/confirm-payment")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Payment confirmed")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot confirm payment")]
+    public async Task<IActionResult> ConfirmPayment(Guid auctionId)
+    {
+        var command = new ConfirmPaymentCommand { AuctionId = auctionId };
+        var result = await mediator.Send(command);
+
+        if (result.Result.IsError)
+        {
+            return result.Result.GetError() switch
+            {
+                ConfirmPaymentError.AuctionNotFound => NotFound(),
+                _ => BadRequest(new { error = result.Result.GetError().ToString() })
+            };
+        }
+
+        return Ok(new { paymentConfirmed = result.PaymentConfirmed });
+    }
+
+    [HttpPost("{auctionId}/process-deadline")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Deadline processed")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot process deadline")]
+    public async Task<IActionResult> ProcessPaymentDeadline(Guid auctionId)
+    {
+        var command = new ProcessPaymentDeadlineCommand { AuctionId = auctionId };
+        var result = await mediator.Send(command);
+
+        if (result.Result.IsError)
+        {
+            return result.Result.GetError() switch
+            {
+                ProcessPaymentError.AuctionNotFound => NotFound(),
+                _ => BadRequest(new { error = result.Result.GetError().ToString() })
+            };
+        }
+
+        return Ok(new
+        {
+            newWinnerId = result.NewWinnerId,
+            allBidsExhausted = result.AllBidsExhausted
+        });
+    }
+
     private static CreateAuctionCommand MapToCommand(CreateAuctionRequest request) => new()
     {
         Title = request.Title,

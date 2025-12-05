@@ -1,5 +1,6 @@
 using Application.Api.Auctions;
 using Application.Commands.Auctions;
+using Application.Configs;
 using Domain.Auctions;
 using Infrastructure.InMemory;
 using Tests.Utils;
@@ -13,6 +14,7 @@ public class FinalizationAndTieBreakingTests
     private IBidsRepository _bidsRepository = null!;
     private TestTimeProvider _timeProvider = null!;
     private WinnerSelectionService _winnerSelectionService = null!;
+    private IPaymentWindowConfig _paymentConfig = null!;
 
     [SetUp]
     public void SetUp()
@@ -21,6 +23,12 @@ public class FinalizationAndTieBreakingTests
         _bidsRepository = new BidsRepository();
         _timeProvider = new TestTimeProvider();
         _winnerSelectionService = new WinnerSelectionService();
+
+        _paymentConfig = new TestPaymentWindowConfig
+        {
+            PaymentDeadline = TimeSpan.FromHours(3),
+            BanDurationDays = 7
+        };
     }
 
     [Test]
@@ -355,9 +363,21 @@ public class FinalizationAndTieBreakingTests
         var time = _timeProvider.Now();
         var bids = new List<Bid>
         {
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200, PlacedAt = time.AddMinutes(2) },
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200, PlacedAt = time.AddMinutes(0) },
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200, PlacedAt = time.AddMinutes(1) }
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200,
+                PlacedAt = time.AddMinutes(2)
+            },
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200,
+                PlacedAt = time.AddMinutes(0)
+            },
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200,
+                PlacedAt = time.AddMinutes(1)
+            }
         };
 
         // Act
@@ -402,9 +422,21 @@ public class FinalizationAndTieBreakingTests
         };
         var bids = new List<Bid>
         {
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200, PlacedAt = DateTime.UtcNow },
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 300, PlacedAt = DateTime.UtcNow },
-            new() { Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 400, PlacedAt = DateTime.UtcNow }
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 200,
+                PlacedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 300,
+                PlacedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                Id = Guid.NewGuid(), AuctionId = auction.Id, UserId = Guid.NewGuid(), Amount = 400,
+                PlacedAt = DateTime.UtcNow
+            }
         };
 
         // Act
@@ -420,6 +452,7 @@ public class FinalizationAndTieBreakingTests
             _auctionsRepository,
             _bidsRepository,
             _timeProvider,
+            _paymentConfig,
             _winnerSelectionService);
     }
 

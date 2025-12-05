@@ -16,8 +16,12 @@ public class Auction
     public AuctionState State { get; private set; } = AuctionState.Pending;
     public Guid? WinnerId { get; private set; }
     public decimal? WinningBidAmount { get; private set; }
+    public Guid? ProvisionalWinnerId { get; private set; }
+    public decimal? ProvisionalWinningAmount { get; private set; }
+    public DateTime? PaymentDeadline { get; private set; }
+    public bool IsPaymentConfirmed { get; private set; }
 
-    public bool IsActive(DateTime currentTime) => 
+    public bool IsActive(DateTime currentTime) =>
         State == AuctionState.Active && currentTime < EndTime;
 
     public bool CanTransitionToActive(DateTime currentTime)
@@ -31,7 +35,7 @@ public class Auction
     {
         if (State != AuctionState.Pending)
             throw new InvalidOperationException("Can only transition to Active from Pending state!");
-        
+
         State = AuctionState.Active;
     }
 
@@ -42,7 +46,7 @@ public class Auction
     {
         if (State != AuctionState.Active)
             throw new InvalidOperationException("Can only transition to Ended from Active state!");
-        
+
         State = AuctionState.Ended;
     }
 
@@ -52,7 +56,7 @@ public class Auction
     {
         if (!CanFinalize())
             throw new InvalidOperationException("Can only finalize after auction has ended!");
-        
+
         WinnerId = winnerId;
         WinningBidAmount = winningAmount;
         State = AuctionState.Finalized;
@@ -62,7 +66,50 @@ public class Auction
     {
         if (State != AuctionState.Active)
             throw new InvalidOperationException("Can only extend active auctions!");
-        
+
         EndTime = EndTime.Add(extension);
+    }
+
+    public void SetProvisionalWinner(Guid userId, decimal amount, DateTime deadline)
+    {
+        if (State != AuctionState.Finalized)
+            throw new InvalidOperationException("Can only set provisional winner on finalized auction!");
+
+        ProvisionalWinnerId = userId;
+        ProvisionalWinningAmount = amount;
+        PaymentDeadline = deadline;
+        IsPaymentConfirmed = false;
+    }
+
+    public void ConfirmPayment()
+    {
+        if (!ProvisionalWinnerId.HasValue)
+            throw new InvalidOperationException("No provisional winner to confirm!");
+
+        WinnerId = ProvisionalWinnerId;
+        WinningBidAmount = ProvisionalWinningAmount;
+        IsPaymentConfirmed = true;
+        PaymentDeadline = null;
+    }
+
+    public void RejectProvisionalWinner()
+    {
+        if (!ProvisionalWinnerId.HasValue)
+            throw new InvalidOperationException("No provisional winner to reject!");
+
+        ProvisionalWinnerId = null;
+        ProvisionalWinningAmount = null;
+        PaymentDeadline = null;
+        IsPaymentConfirmed = false;
+    }
+
+    public bool IsPaymentDeadlinePassed(DateTime currentTime)
+    {
+        return PaymentDeadline.HasValue && currentTime > PaymentDeadline.Value;
+    }
+
+    public bool HasProvisionalWinner()
+    {
+        return ProvisionalWinnerId.HasValue && !IsPaymentConfirmed;
     }
 }
