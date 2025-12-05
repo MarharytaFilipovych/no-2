@@ -1,5 +1,6 @@
 using Application.Api.Auctions;
 using Application.Api.Utils;
+using Application.Configs;
 using Application.Utils;
 using Domain.Auctions;
 using MediatR;
@@ -29,6 +30,7 @@ public class FinalizeAuctionCommandHandler(
     IAuctionsRepository auctionsRepository,
     IBidsRepository bidsRepository,
     ITimeProvider timeProvider,
+    IPaymentWindowConfig paymentWindowConfig,
     WinnerSelectionService winnerSelectionService)
     : IRequestHandler<FinalizeAuctionCommand, FinalizeAuctionCommand.Response>
 {
@@ -49,8 +51,16 @@ public class FinalizeAuctionCommandHandler(
         var bids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
         var winner = await winnerSelectionService.SelectWinner(auction, bids);
 
-        auction.Finalize(winner?.UserId, winner?.Amount);
+        auction.Finalize(winnerId: null, winningAmount: null);
         await auctionsRepository.UpdateAuction(auction);
+
+        if (winner != null)
+        {
+            var currentTime = timeProvider.Now();
+            var deadline = currentTime.Add(paymentWindowConfig.PaymentDeadline);
+            auction.SetProvisionalWinner(winner.UserId, winner.Amount, deadline);
+            await auctionsRepository.UpdateAuction(auction);
+        }
 
         return SuccessResponse(auction.WinnerId, auction.WinningBidAmount);
     }
