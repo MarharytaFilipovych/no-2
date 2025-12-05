@@ -38,6 +38,8 @@ builder.Services.AddScoped<ILoginValidator, UserCredentialsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, SessionExistsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, RefreshTokenMatchValidator>();
 
+builder.InstallConfigFromSection<IPaymentWindowConfig, PaymentWindowConfig>("PaymentWindow");   
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllForTesting",
@@ -64,6 +66,9 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Pr
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<RegisterCommand>());
 
 builder.Services.AddPersistence();
+
+builder.Services.AddSingleton<Domain.Auctions.AuctionVisibilityService>();
+builder.Services.AddSingleton<Domain.Auctions.WinnerSelectionService>();
 
 var jwtTokenConfig = builder.InstallConfigFromSection<IJwtTokenConfig, JwtTokenConfig>("JwtToken");
 builder.InstallConfigFromSection<IBiddingConfig, BiddingConfig>("BiddingConfig");
