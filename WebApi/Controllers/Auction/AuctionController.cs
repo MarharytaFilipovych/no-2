@@ -11,7 +11,9 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 [ApiController, Route("auctions")]
-public class AuctionsController(IMediator mediator, IAuctionsRepository auctionsRepository,
+public class AuctionsController(
+    IMediator mediator,
+    IAuctionsRepository auctionsRepository,
     IBidsRepository bidsRepository) : ControllerBase
 {
     [HttpPost]
@@ -82,21 +84,21 @@ public class AuctionsController(IMediator mediator, IAuctionsRepository auctions
     [SwaggerResponse(StatusCodes.Status404NotFound, "Auction not found")]
     public async Task<IActionResult> FinalizeAuction(Guid auctionId)
     {
-        var auction = await auctionsRepository.GetAuction(auctionId);
-        if (auction == null) return NotFound();
+        var command = new FinalizeAuctionCommand { AuctionId = auctionId };
+        var result = await mediator.Send(command);
 
-        if (!auction.CanFinalize())
-            return BadRequest(new { error = "Auction must be in Ended state to finalize" });
+        if (result.Result.IsError)
+        {
+            return result.Result.GetError() switch
+            {
+                FinalizeAuctionError.AuctionNotFound => NotFound(new { error = "Auction not found!" }),
+                FinalizeAuctionError.AlreadyFinalized => BadRequest(new { error = "Auction already finalized!" }),
+                FinalizeAuctionError.AuctionNotEnded => BadRequest(new { error = "Auction not ended yet!" }),
+                _ => BadRequest(new { error = result.Result.GetError().ToString() })
+            };
+        }
 
-        var highestBid = await bidsRepository.GetHighestBidForAuction(auctionId);
-
-        if (highestBid != null && highestBid.Amount >= auction.MinPrice)
-            auction.Finalize(highestBid.UserId, highestBid.Amount);
-        else auction.Finalize(null, null);
-
-        await auctionsRepository.UpdateAuction(auction);
-
-        return Ok(new AuctionFinalizedResponse(auction.WinnerId, auction.WinningBidAmount));
+        return Ok(new AuctionFinalizedResponse(result.WinnerId, result.WinningAmount));
     }
 
     private static CreateAuctionCommand MapToCommand(CreateAuctionRequest request) => new()
@@ -119,7 +121,8 @@ public class AuctionsController(IMediator mediator, IAuctionsRepository auctions
             a.Id, a.Title, a.Description,
             a.EndTime, a.Type.ToString(),
             a.ShowMinPrice ? a.MinPrice : null, a.Type == AuctionType.Open
-                ? (await bidsRepository.GetHighestBidForAuction(a.Id))?.Amount : null
+                ? (await bidsRepository.GetHighestBidForAuction(a.Id))?.Amount
+                : null
         ));
 
         return await Task.WhenAll(responseTasks);

@@ -40,8 +40,6 @@ public class FinalizeAuctionCommandHandler(
         if (auction == null)
             return ErrorResponse(FinalizeAuctionError.AuctionNotFound);
 
-        var currentTime = timeProvider.Now();
-        
         if (auction.State == AuctionState.Finalized)
             return ErrorResponse(FinalizeAuctionError.AlreadyFinalized);
 
@@ -54,7 +52,7 @@ public class FinalizeAuctionCommandHandler(
         auction.Finalize(winner?.UserId, winner?.Amount);
         await auctionsRepository.UpdateAuction(auction);
 
-        return SuccessResponse(winner?.UserId, winner?.Amount);
+        return SuccessResponse(auction.WinnerId, auction.WinningBidAmount);
     }
 
     private static FinalizeAuctionCommand.Response ErrorResponse(FinalizeAuctionError error) =>
