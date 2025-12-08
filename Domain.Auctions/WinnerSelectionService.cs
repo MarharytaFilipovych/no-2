@@ -2,13 +2,14 @@ namespace Domain.Auctions;
 
 public class WinnerSelectionService
 {
-    public Task<Bid?> SelectWinner(Auction auction, List<Bid> activeBids)
+    public Task<Bid?> SelectWinner(Auction auction, List<Bid> activeBids, HashSet<Guid>? excludedUserIds = null)
     {
         if (activeBids.Count == 0)
             return Task.FromResult<Bid?>(null);
 
         var eligibleBids = activeBids
             .Where(b => b.Amount >= auction.MinPrice)
+            .Where(b => excludedUserIds == null || !excludedUserIds.Contains(b.UserId))
             .ToList();
 
         if (eligibleBids.Count == 0)

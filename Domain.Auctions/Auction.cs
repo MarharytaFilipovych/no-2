@@ -20,6 +20,7 @@ public class Auction
     public decimal? ProvisionalWinningAmount { get; private set; }
     public DateTime? PaymentDeadline { get; private set; }
     public bool IsPaymentConfirmed { get; private set; }
+    public string? Category { get; init; }
 
     public bool IsActive(DateTime currentTime) =>
         State == AuctionState.Active && currentTime < EndTime;
@@ -111,5 +112,19 @@ public class Auction
     public bool HasProvisionalWinner()
     {
         return ProvisionalWinnerId.HasValue && !IsPaymentConfirmed;
+    }
+    
+    public void FinalizeWithProvisionalWinner(Guid userId, decimal amount, DateTime paymentDeadline)
+    {
+        if (!CanFinalize())
+            throw new InvalidOperationException("Can only finalize after auction has ended!");
+
+        State = AuctionState.Finalized;
+        SetProvisionalWinner(userId, amount, paymentDeadline);
+    }
+
+    public void FinalizeWithNoWinner()
+    {
+        Finalize(null, null);
     }
 }
