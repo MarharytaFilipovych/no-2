@@ -8,4 +8,5 @@ public interface IAuctionsRepository
     Task<Auction> CreateAuction(Auction auction);
     Task UpdateAuction(Auction auction);
     Task<List<Auction>> GetAuctionsByState(AuctionState state);
+    Task<List<Auction>> GetFinalizedAuctionsByCategoryAndPeriod(string category, DateTime startDate, DateTime endDate);
 }

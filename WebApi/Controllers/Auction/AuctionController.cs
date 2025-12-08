@@ -149,6 +149,7 @@ public class AuctionsController(
     {
         Title = request.Title,
         Description = request.Description,
+        Category = request.Category,
         StartTime = request.StartTime,
         EndTime = request.EndTime,
         Type = request.Type,

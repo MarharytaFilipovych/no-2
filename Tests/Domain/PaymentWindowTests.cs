@@ -1,4 +1,5 @@
 using Domain.Auctions;
+using Domain.Users;
 using Application.Api.Auctions;
 using Application.Commands.Auctions;
 using Infrastructure.InMemory;
@@ -16,6 +17,10 @@ public class PaymentWindowTests
     private TestTimeProvider _timeProvider = null!;
     private TestPaymentWindowConfig _paymentConfig = null!;
     private WinnerSelectionService _winnerSelectionService = null!;
+    private IAuctionCycleRepository _cycleRepository = null!;
+    private NoRepeatWinnerPolicy _noRepeatWinnerPolicy = null!;
+    private PaymentProcessingService _paymentProcessingService = null!;
+    private BanPolicy _banPolicy = null!;
 
     [SetUp]
     public void SetUp()
@@ -24,6 +29,7 @@ public class PaymentWindowTests
         _bidsRepository = new BidsRepository();
         _balanceRepository = new ParticipantBalanceRepository();
         _usersRepository = new UserRepository();
+        _cycleRepository = new AuctionCycleRepository();
         _timeProvider = new TestTimeProvider();
         _paymentConfig = new TestPaymentWindowConfig
         {
@@ -31,22 +37,22 @@ public class PaymentWindowTests
             BanDurationDays = 7
         };
         _winnerSelectionService = new WinnerSelectionService();
+        _noRepeatWinnerPolicy = new NoRepeatWinnerPolicy();
+        _paymentProcessingService = new PaymentProcessingService();
+        _banPolicy = new BanPolicy();
     }
 
     [Test]
     public async Task FinalizeAuction_ShouldSetProvisionalWinner()
     {
-        // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
         var userId = Guid.NewGuid();
         await PlaceBid(auction.Id, userId, 150);
         var handler = CreateFinalizeHandler();
         var command = new FinalizeAuctionCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         var updatedAuction = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(updatedAuction!.ProvisionalWinnerId, Is.EqualTo(userId));
@@ -58,16 +64,13 @@ public class PaymentWindowTests
     [Test]
     public async Task ConfirmPayment_WithSufficientBalance_ShouldSucceed()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 200);
         var handler = CreateConfirmPaymentHandler();
         var command = new ConfirmPaymentCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         Assert.That(result.PaymentConfirmed, Is.True);
 
@@ -79,16 +82,13 @@ public class PaymentWindowTests
     [Test]
     public async Task ConfirmPayment_WithInsufficientBalance_ShouldFail()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 50);
         var handler = CreateConfirmPaymentHandler();
         var command = new ConfirmPaymentCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsError, Is.True);
         Assert.That(result.Result.GetError(), Is.EqualTo(ConfirmPaymentError.InsufficientBalance));
         Assert.That(result.PaymentConfirmed, Is.False);
@@ -97,7 +97,6 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_AfterDeadlineWithInsufficientFunds_ShouldPromoteNextBid()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         var user2 = Guid.NewGuid();
         await PlaceBid(auction.Id, user2, 140);
@@ -110,10 +109,8 @@ public class PaymentWindowTests
         var handler = CreateProcessDeadlineHandler();
         var command = new ProcessPaymentDeadlineCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         Assert.That(result.NewWinnerId, Is.EqualTo(user2));
         Assert.That(result.AllBidsExhausted, Is.False);
@@ -125,7 +122,6 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_ShouldBanRejectedUser()
     {
-        // Arrange
         var rejectedUserId = Guid.NewGuid();
         var user = await _usersRepository.CreateUser("rejected@test.com", "hash");
 
@@ -137,10 +133,8 @@ public class PaymentWindowTests
         var handler = CreateProcessDeadlineHandler();
         var command = new ProcessPaymentDeadlineCommand { AuctionId = auction.Id };
 
-        // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         var bannedUser = await _usersRepository.GetUser(user.UserId);
         Assert.That(bannedUser, Is.Not.Null);
         Assert.That(bannedUser!.BannedUntil, Is.Not.Null);
@@ -153,7 +147,6 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_AllBidsInsufficientFunds_ShouldExhaustBids()
     {
-        // Arrange
         var user1 = Guid.NewGuid();
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150, user1);
 
@@ -163,12 +156,10 @@ public class PaymentWindowTests
 
         var handler = CreateProcessDeadlineHandler();
 
-        // Act
         var result = await handler.Handle(
             new ProcessPaymentDeadlineCommand { AuctionId = auction.Id },
             CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         Assert.That(result.AllBidsExhausted, Is.True);
         Assert.That(result.NewWinnerId, Is.Null);
@@ -182,17 +173,14 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_BeforeDeadline_ShouldFail()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 50);
 
         var handler = CreateProcessDeadlineHandler();
         var command = new ProcessPaymentDeadlineCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsError, Is.True);
         Assert.That(result.Result.GetError(), Is.EqualTo(ProcessPaymentError.DeadlineNotPassed));
     }
@@ -200,7 +188,6 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_WinnerPaysBeforeDeadline_ShouldConfirmPayment()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 200);
 
@@ -209,10 +196,8 @@ public class PaymentWindowTests
         var handler = CreateProcessDeadlineHandler();
         var command = new ProcessPaymentDeadlineCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         var finalAuction = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(finalAuction!.IsPaymentConfirmed, Is.True);
@@ -222,21 +207,17 @@ public class PaymentWindowTests
     [Test]
     public async Task Auction_HasProvisionalWinner_ShouldReturnTrue()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
 
-        // Assert
         Assert.That(auction.HasProvisionalWinner(), Is.True);
     }
 
     [Test]
     public async Task Auction_AfterPaymentConfirmed_ShouldNotHaveProvisionalWinner()
     {
-        // Arrange
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
         auction.ConfirmPayment();
 
-        // Assert
         Assert.That(auction.HasProvisionalWinner(), Is.False);
         Assert.That(auction.IsPaymentConfirmed, Is.True);
     }
@@ -244,7 +225,6 @@ public class PaymentWindowTests
     [Test]
     public void Auction_SetProvisionalWinner_NotFinalized_ShouldThrow()
     {
-        // Arrange
         var auction = new Auction
         {
             Title = "Test",
@@ -253,9 +233,26 @@ public class PaymentWindowTests
             Type = AuctionType.Open
         };
 
-        // Act & Assert
         Assert.Throws<InvalidOperationException>(() =>
             auction.SetProvisionalWinner(Guid.NewGuid(), 150, DateTime.UtcNow.AddHours(3)));
+    }
+
+    [Test]
+    public void PaymentProcessingService_SufficientBalance_ShouldConfirm()
+    {
+        var service = new PaymentProcessingService();
+        var auction = CreateFinalizedAuctionWithProvisionalWinnerSync(100, 150);
+        var balance = 200m;
+
+        var result = service.ProcessPaymentDeadline(
+            auction, 
+            new List<Bid>(), 
+            balance,
+            new HashSet<Guid>(),
+            _ => false);
+
+        Assert.That(result.IsConfirmed, Is.True);
+        Assert.That(auction.IsPaymentConfirmed, Is.True);
     }
 
     private FinalizeAuctionCommandHandler CreateFinalizeHandler()
@@ -263,9 +260,11 @@ public class PaymentWindowTests
         return new FinalizeAuctionCommandHandler(
             _auctionsRepository,
             _bidsRepository,
+            _cycleRepository,
             _timeProvider,
             _paymentConfig,
-            _winnerSelectionService);
+            _winnerSelectionService,
+            _noRepeatWinnerPolicy);
     }
 
     private ConfirmPaymentCommandHandler CreateConfirmPaymentHandler()
@@ -281,11 +280,15 @@ public class PaymentWindowTests
         return new ProcessPaymentDeadlineCommandHandler(
             _auctionsRepository,
             _bidsRepository,
+            _cycleRepository,
             _balanceRepository,
             _usersRepository,
             _timeProvider,
             _paymentConfig,
-            _winnerSelectionService);
+            _winnerSelectionService,
+            _noRepeatWinnerPolicy,
+            _paymentProcessingService,
+            _banPolicy);
     }
 
     private async Task<Auction> CreateEndedAuction(decimal minPrice = 100)
@@ -319,6 +322,27 @@ public class PaymentWindowTests
         auction.SetProvisionalWinner(userId, winningBid, deadline);
         await _auctionsRepository.UpdateAuction(auction);
 
+        return auction;
+    }
+
+    private Auction CreateFinalizedAuctionWithProvisionalWinnerSync(
+        decimal minPrice,
+        decimal winningBid)
+    {
+        var auction = new Auction
+        {
+            Title = "Test auction",
+            EndTime = DateTime.UtcNow.AddMinutes(-5),
+            Type = AuctionType.Open,
+            MinimumIncrement = 10,
+            MinPrice = minPrice,
+            TieBreakingPolicy = TieBreakingPolicy.Earliest
+        };
+        auction.TransitionToActive();
+        auction.TransitionToEnded();
+        auction.Finalize(null, null);
+        var deadline = DateTime.UtcNow.AddHours(3);
+        auction.SetProvisionalWinner(Guid.NewGuid(), winningBid, deadline);
         return auction;
     }
 

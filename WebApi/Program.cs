@@ -38,6 +38,12 @@ builder.Services.AddScoped<ILoginValidator, UserCredentialsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, SessionExistsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, RefreshTokenMatchValidator>();
 
+builder.Services.AddSingleton<Domain.Auctions.AuctionVisibilityService>();
+builder.Services.AddSingleton<Domain.Auctions.WinnerSelectionService>();
+builder.Services.AddSingleton<Domain.Auctions.NoRepeatWinnerPolicy>();
+builder.Services.AddSingleton<Domain.Auctions.PaymentProcessingService>();
+builder.Services.AddSingleton<Domain.Users.BanPolicy>();
+
 builder.InstallConfigFromSection<IPaymentWindowConfig, PaymentWindowConfig>("PaymentWindow");   
 
 builder.Services.AddCors(options =>

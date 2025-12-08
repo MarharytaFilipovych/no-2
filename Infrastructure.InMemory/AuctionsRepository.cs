@@ -31,4 +31,18 @@ public class AuctionsRepository : IAuctionsRepository
 
     public Task<List<Auction>> GetAuctionsByState(AuctionState state) =>
         Task.FromResult(_auctions.Values.Where(a => a.State == state).ToList());
+    
+    public Task<List<Auction>> GetFinalizedAuctionsByCategoryAndPeriod(
+        string category, 
+        DateTime startDate, 
+        DateTime endDate)
+    {
+        var result = _auctions.Values
+            .Where(a => a.State == AuctionState.Finalized)
+            .Where(a => a.Category == category)
+            .Where(a => a.EndTime >= startDate && a.EndTime <= endDate)
+            .ToList();
+        
+        return Task.FromResult(result);
+    }
 }
