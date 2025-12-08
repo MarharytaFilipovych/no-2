@@ -15,5 +15,6 @@ public static class InMemoryInstallerExtensions
         services.AddSingleton<IAuctionsRepository, AuctionsRepository>();
         services.AddSingleton<IBidsRepository, BidsRepository>();
         services.AddSingleton<IParticipantBalanceRepository, ParticipantBalanceRepository>();
+        services.AddSingleton<IAuctionCycleRepository, AuctionCycleRepository>();
     }
 }
