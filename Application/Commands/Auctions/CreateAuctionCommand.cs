@@ -19,6 +19,7 @@ public class CreateAuctionCommand : IRequest<CreateAuctionCommand.Response>
     public TimeSpan? SoftCloseWindow { get; init; }
     public bool ShowMinPrice { get; init; }
     public TieBreakingPolicy TieBreakingPolicy { get; init; }
+    public string? Category { get; init; }
 
     public class Response
     {

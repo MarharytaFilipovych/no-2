@@ -6,6 +6,7 @@ using Application.Api.Utils;
 using Configs;
 using Utils;
 using Domain.Auctions;
+using Domain.Users;
 using MediatR;
 
 public class ProcessPaymentDeadlineCommand : IRequest<ProcessPaymentDeadlineCommand.Response>
@@ -30,11 +31,15 @@ public enum ProcessPaymentError
 public class ProcessPaymentDeadlineCommandHandler(
     IAuctionsRepository auctionsRepository,
     IBidsRepository bidsRepository,
+    IAuctionCycleRepository cycleRepository,
     IParticipantBalanceRepository balanceRepository,
     IUsersRepository usersRepository,
     ITimeProvider timeProvider,
     IPaymentWindowConfig paymentConfig,
-    WinnerSelectionService winnerSelectionService)
+    WinnerSelectionService winnerSelectionService,
+    NoRepeatWinnerPolicy noRepeatWinnerPolicy,
+    PaymentProcessingService paymentProcessingService,
+    BanPolicy banPolicy)
     : IRequestHandler<ProcessPaymentDeadlineCommand, ProcessPaymentDeadlineCommand.Response>
 {
     public async Task<ProcessPaymentDeadlineCommand.Response> Handle(
@@ -53,18 +58,30 @@ public class ProcessPaymentDeadlineCommandHandler(
             return ErrorResponse(ProcessPaymentError.DeadlineNotPassed);
 
         var balance = await balanceRepository.GetBalance(auction.ProvisionalWinnerId!.Value);
-        if (balance >= auction.ProvisionalWinningAmount!.Value)
+
+        var allBids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
+
+        var excludedUsers = await GetExcludedUsersForAuction(auction, currentTime);
+
+        var result = paymentProcessingService.ProcessPaymentDeadline(
+            auction,
+            allBids,
+            balance,
+            excludedUsers ?? new HashSet<Guid>(),
+            userId => IsUserBanned(userId, currentTime).Result);
+
+        if (result.IsConfirmed)
         {
-            auction.ConfirmPayment();
             await auctionsRepository.UpdateAuction(auction);
-            return SuccessResponse(auction.WinnerId, false);
+            return SuccessResponse(result.ConfirmedWinnerId, false);
         }
 
-        var rejectedUserId = auction.ProvisionalWinnerId.Value;
-        await BanUser(rejectedUserId, currentTime);
-        auction.RejectProvisionalWinner();
+        await BanUserForPaymentFailure(result.RejectedUserId!.Value, currentTime);
 
-        var newWinner = await PromoteNextEligibleBid(auction, rejectedUserId);
+        var newWinner = await winnerSelectionService.SelectWinner(
+            auction, 
+            result.EligibleBidsForPromotion, 
+            null);
 
         if (newWinner != null)
         {
@@ -78,30 +95,38 @@ public class ProcessPaymentDeadlineCommandHandler(
         return SuccessResponse(null, true);
     }
 
-    private async Task BanUser(Guid userId, DateTime currentTime)
+    private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction, DateTime currentTime)
     {
-        var user = await usersRepository.GetUser(userId);
-        if (user != null)
-        {
-            var banUntil = currentTime.AddDays(paymentConfig.BanDurationDays);
-            user.Ban(banUntil);
-            await usersRepository.UpdateUser(user);
-        }
-    }
-
-    private async Task<Bid?> PromoteNextEligibleBid(Domain.Auctions.Auction auction, Guid rejectedUserId)
-    {
-        var allBids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
-
-        var eligibleBids = allBids
-            .Where(b => b.UserId != rejectedUserId)
-            .Where(b => b.Amount >= auction.MinPrice)
-            .ToList();
-
-        if (eligibleBids.Count == 0)
+        if (string.IsNullOrEmpty(auction.Category))
             return null;
 
-        return await winnerSelectionService.SelectWinner(auction, eligibleBids);
+        var cycle = await cycleRepository.GetActiveCycle();
+        if (cycle == null)
+            return null;
+
+        var finalizedInCategory = await auctionsRepository
+            .GetFinalizedAuctionsByCategoryAndPeriod(
+                auction.Category,
+                cycle.StartDate,
+                cycle.EndDate);
+
+        return noRepeatWinnerPolicy.GetExcludedUsers(auction, finalizedInCategory);
+    }
+
+    private async Task<bool> IsUserBanned(Guid userId, DateTime currentTime)
+    {
+        var user = await usersRepository.GetUser(userId);
+        return user?.IsBanned(currentTime) ?? false;
+    }
+
+    private async Task BanUserForPaymentFailure(Guid userId, DateTime currentTime)
+    {
+        var user = await usersRepository.GetUser(userId);
+        if (user == null)
+            return;
+
+        banPolicy.BanForPaymentFailure(user, currentTime, paymentConfig.BanDurationDays);
+        await usersRepository.UpdateUser(user);
     }
 
     private static ProcessPaymentDeadlineCommand.Response ErrorResponse(ProcessPaymentError error) =>
