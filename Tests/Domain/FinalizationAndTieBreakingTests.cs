@@ -15,14 +15,18 @@ public class FinalizationAndTieBreakingTests
     private TestTimeProvider _timeProvider = null!;
     private WinnerSelectionService _winnerSelectionService = null!;
     private IPaymentWindowConfig _paymentConfig = null!;
+    private IAuctionCycleRepository _cycleRepository = null!;
+    private NoRepeatWinnerPolicy _noRepeatWinnerPolicy = null!;
 
     [SetUp]
     public void SetUp()
     {
         _auctionsRepository = new AuctionsRepository();
         _bidsRepository = new BidsRepository();
+        _cycleRepository = new AuctionCycleRepository();
         _timeProvider = new TestTimeProvider();
         _winnerSelectionService = new WinnerSelectionService();
+        _noRepeatWinnerPolicy = new NoRepeatWinnerPolicy();
 
         _paymentConfig = new TestPaymentWindowConfig
         {
@@ -34,26 +38,24 @@ public class FinalizationAndTieBreakingTests
     [Test]
     public async Task FinalizeAuction_WithSingleValidBid_ShouldSelectWinner()
     {
-        // Arrange
         var auction = await CreateEndedAuction(minPrice: 100);
         var userId = Guid.NewGuid();
         await PlaceBid(auction.Id, userId, 150);
         var handler = CreateHandler();
         var command = new FinalizeAuctionCommand { AuctionId = auction.Id };
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         Assert.That(result.Result.IsOk, Is.True);
         Assert.That(result.WinnerId, Is.EqualTo(userId));
         Assert.That(result.WinningAmount, Is.EqualTo(150));
 
         var finalizedAuction = await _auctionsRepository.GetAuction(auction.Id);
         Assert.That(finalizedAuction!.State, Is.EqualTo(AuctionState.Finalized));
-        Assert.That(finalizedAuction.WinnerId, Is.EqualTo(userId));
-        Assert.That(finalizedAuction.WinningBidAmount, Is.EqualTo(150));
+        Assert.That(finalizedAuction.ProvisionalWinnerId, Is.EqualTo(userId));
+        Assert.That(finalizedAuction.ProvisionalWinningAmount, Is.EqualTo(150));
     }
+
 
     [Test]
     public async Task FinalizeAuction_WithMultipleBids_ShouldSelectHighest()
@@ -451,9 +453,11 @@ public class FinalizationAndTieBreakingTests
         return new FinalizeAuctionCommandHandler(
             _auctionsRepository,
             _bidsRepository,
+            _cycleRepository,
             _timeProvider,
             _paymentConfig,
-            _winnerSelectionService);
+            _winnerSelectionService,
+            _noRepeatWinnerPolicy);
     }
 
     private async Task<Auction> CreateActiveAuction()
