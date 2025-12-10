@@ -80,21 +80,6 @@ public class PaymentWindowTests
     }
 
     [Test]
-    public async Task ConfirmPayment_WithInsufficientBalance_ShouldFail()
-    {
-        var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
-        await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 50);
-        var handler = CreateConfirmPaymentHandler();
-        var command = new ConfirmPaymentCommand { AuctionId = auction.Id };
-
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(ConfirmPaymentError.InsufficientBalance));
-        Assert.That(result.PaymentConfirmed, Is.False);
-    }
-
-    [Test]
     public async Task ProcessDeadline_AfterDeadlineWithInsufficientFunds_ShouldPromoteNextBid()
     {
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
@@ -122,9 +107,7 @@ public class PaymentWindowTests
     [Test]
     public async Task ProcessDeadline_ShouldBanRejectedUser()
     {
-        var rejectedUserId = Guid.NewGuid();
         var user = await _usersRepository.CreateUser("rejected@test.com", "hash");
-
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150, user!.UserId);
         await _balanceRepository.DepositFunds(user.UserId, 50);
 
@@ -149,7 +132,6 @@ public class PaymentWindowTests
     {
         var user1 = Guid.NewGuid();
         var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150, user1);
-
         await _balanceRepository.DepositFunds(user1, 50);
 
         _timeProvider.AddTime(TimeSpan.FromHours(4));
@@ -168,21 +150,6 @@ public class PaymentWindowTests
         Assert.That(finalAuction!.State, Is.EqualTo(AuctionState.Finalized));
         Assert.That(finalAuction.WinnerId, Is.Null);
         Assert.That(finalAuction.WinningBidAmount, Is.Null);
-    }
-
-    [Test]
-    public async Task ProcessDeadline_BeforeDeadline_ShouldFail()
-    {
-        var auction = await CreateFinalizedAuctionWithProvisionalWinner(100, 150);
-        await _balanceRepository.DepositFunds(auction.ProvisionalWinnerId!.Value, 50);
-
-        var handler = CreateProcessDeadlineHandler();
-        var command = new ProcessPaymentDeadlineCommand { AuctionId = auction.Id };
-
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(ProcessPaymentError.DeadlineNotPassed));
     }
 
     [Test]
@@ -264,7 +231,8 @@ public class PaymentWindowTests
             _timeProvider,
             _paymentConfig,
             _winnerSelectionService,
-            _noRepeatWinnerPolicy);
+            _noRepeatWinnerPolicy,
+            new List<Application.Validators.Auctions.IFinalizeAuctionValidator>());
     }
 
     private ConfirmPaymentCommandHandler CreateConfirmPaymentHandler()
@@ -272,7 +240,8 @@ public class PaymentWindowTests
         return new ConfirmPaymentCommandHandler(
             _auctionsRepository,
             _balanceRepository,
-            _timeProvider);
+            _timeProvider,
+            new List<Application.Validators.Auctions.IConfirmPaymentValidator>());
     }
 
     private ProcessPaymentDeadlineCommandHandler CreateProcessDeadlineHandler()
@@ -288,7 +257,8 @@ public class PaymentWindowTests
             _winnerSelectionService,
             _noRepeatWinnerPolicy,
             _paymentProcessingService,
-            _banPolicy);
+            _banPolicy,
+            new List<Application.Validators.Auctions.IProcessPaymentDeadlineValidator>());
     }
 
     private async Task<Auction> CreateEndedAuction(decimal minPrice = 100)

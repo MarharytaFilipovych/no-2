@@ -2,6 +2,7 @@ namespace Application.Commands.Auctions;
 
 using Application.Api.Auctions;
 using Application.Api.Utils;
+using Application.Validators.Auctions;
 using Utils;
 using MediatR;
 
@@ -21,40 +22,46 @@ public enum ConfirmPaymentError
     AuctionNotFound,
     NoProvisionalWinner,
     InsufficientBalance,
-    DeadlineNotPassed
+    DeadlineAlreadyPassed
 }
 
 public class ConfirmPaymentCommandHandler(
     IAuctionsRepository auctionsRepository,
     IParticipantBalanceRepository balanceRepository,
-    ITimeProvider timeProvider)
+    ITimeProvider timeProvider,
+    IEnumerable<IConfirmPaymentValidator> validators)
     : IRequestHandler<ConfirmPaymentCommand, ConfirmPaymentCommand.Response>
 {
-    public async Task<ConfirmPaymentCommand.Response> Handle(
-        ConfirmPaymentCommand request,
+    public async Task<ConfirmPaymentCommand.Response> Handle(ConfirmPaymentCommand request,
         CancellationToken cancellationToken)
     {
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
-        if (auction == null)
-            return ErrorResponse(ConfirmPaymentError.AuctionNotFound);
-
-        if (!auction.HasProvisionalWinner())
-            return ErrorResponse(ConfirmPaymentError.NoProvisionalWinner);
-
         var currentTime = timeProvider.Now();
 
-        var balance = await balanceRepository.GetBalance(auction.ProvisionalWinnerId!.Value);
-        if (balance >= auction.ProvisionalWinningAmount!.Value)
+        var balance = auction?.ProvisionalWinnerId != null
+            ? await balanceRepository.GetBalance(auction.ProvisionalWinnerId.Value)
+            : 0m;
+
+        var validationError = await ValidatePaymentConfirmation(auction, balance, currentTime);
+        if (validationError != null)
+            return ErrorResponse(validationError.Value);
+
+        auction!.ConfirmPayment();
+        await auctionsRepository.UpdateAuction(auction);
+
+        return SuccessResponse(true);
+    }
+
+    private async Task<ConfirmPaymentError?> ValidatePaymentConfirmation(Domain.Auctions.Auction? auction,
+        decimal balance, DateTime currentTime)
+    {
+        foreach (var validator in validators)
         {
-            auction.ConfirmPayment();
-            await auctionsRepository.UpdateAuction(auction);
-            return SuccessResponse(true);
+            var error = await validator.Validate(auction, balance, currentTime);
+            if (error.HasValue) return error;
         }
 
-        if (!auction.IsPaymentDeadlinePassed(currentTime))
-            return ErrorResponse(ConfirmPaymentError.InsufficientBalance);
-
-        return ErrorResponse(ConfirmPaymentError.InsufficientBalance);
+        return null;
     }
 
     private static ConfirmPaymentCommand.Response ErrorResponse(ConfirmPaymentError error) =>

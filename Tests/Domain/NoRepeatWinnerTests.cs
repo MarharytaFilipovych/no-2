@@ -60,7 +60,7 @@ public class NoRepeatWinnerTests
             CancellationToken.None);
 
         Assert.That(result.Result.IsOk, Is.True);
-        
+
         var finalizedAuction = await _auctionsRepository.GetAuction(auction2.Id);
         Assert.That(finalizedAuction!.ProvisionalWinnerId, Is.EqualTo(user2));
         Assert.That(finalizedAuction.ProvisionalWinningAmount, Is.EqualTo(180));
@@ -88,7 +88,7 @@ public class NoRepeatWinnerTests
             CancellationToken.None);
 
         Assert.That(result.Result.IsOk, Is.True);
-        
+
         var finalizedAuction = await _auctionsRepository.GetAuction(auction2.Id);
         Assert.That(finalizedAuction!.ProvisionalWinnerId, Is.EqualTo(user1));
     }
@@ -113,7 +113,7 @@ public class NoRepeatWinnerTests
             CancellationToken.None);
 
         Assert.That(result.Result.IsOk, Is.True);
-        
+
         var finalizedAuction = await _auctionsRepository.GetAuction(auction2.Id);
         Assert.That(finalizedAuction!.ProvisionalWinnerId, Is.EqualTo(user1));
     }
@@ -123,7 +123,7 @@ public class NoRepeatWinnerTests
     {
         var policy = new NoRepeatWinnerPolicy();
         var winnerId = Guid.NewGuid();
-        
+
         var currentAuction = new Auction
         {
             Id = Guid.NewGuid(),
@@ -231,6 +231,7 @@ public class NoRepeatWinnerTests
             _timeProvider,
             _paymentConfig,
             _winnerSelectionService,
-            _noRepeatWinnerPolicy);
+            _noRepeatWinnerPolicy,
+            new List<Application.Validators.Auctions.IFinalizeAuctionValidator>());
     }
 }
