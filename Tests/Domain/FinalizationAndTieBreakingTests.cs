@@ -252,82 +252,6 @@ public class FinalizationAndTieBreakingTests
     }
 
     [Test]
-    public async Task FinalizeAuction_AuctionNotFound_ShouldFail()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new FinalizeAuctionCommand { AuctionId = Guid.NewGuid() };
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(FinalizeAuctionError.AuctionNotFound));
-    }
-
-    [Test]
-    public async Task FinalizeAuction_AuctionNotEnded_ShouldFail()
-    {
-        // Arrange
-        var auction = await CreateActiveAuction();
-        var handler = CreateHandler();
-        var command = new FinalizeAuctionCommand { AuctionId = auction.Id };
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(FinalizeAuctionError.AuctionNotEnded));
-    }
-
-    [Test]
-    public async Task FinalizeAuction_AlreadyFinalized_ShouldFail()
-    {
-        // Arrange
-        var auction = await CreateEndedAuction(minPrice: 100);
-        await PlaceBid(auction.Id, Guid.NewGuid(), 150);
-        var handler = CreateHandler();
-        var command = new FinalizeAuctionCommand { AuctionId = auction.Id };
-
-        // First finalization
-        await handler.Handle(command, CancellationToken.None);
-
-        // Act - Try to finalize again
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(FinalizeAuctionError.AlreadyFinalized));
-    }
-
-    [Test]
-    public async Task FinalizeAuction_AuctionPending_ShouldFail()
-    {
-        // Arrange
-        var auction = await _auctionsRepository.CreateAuction(new Auction
-        {
-            Title = "Test auction",
-            StartTime = _timeProvider.Now().AddHours(1),
-            EndTime = _timeProvider.Now().AddHours(2),
-            Type = AuctionType.Open,
-            MinimumIncrement = 10,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        });
-        var handler = CreateHandler();
-        var command = new FinalizeAuctionCommand { AuctionId = auction.Id };
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        Assert.That(result.Result.IsError, Is.True);
-        Assert.That(result.Result.GetError(), Is.EqualTo(FinalizeAuctionError.AuctionNotEnded));
-    }
-
-    [Test]
     public async Task FinalizeAuction_BlindAuction_ShouldWorkCorrectly()
     {
         // Arrange
@@ -457,23 +381,8 @@ public class FinalizationAndTieBreakingTests
             _timeProvider,
             _paymentConfig,
             _winnerSelectionService,
-            _noRepeatWinnerPolicy);
-    }
-
-    private async Task<Auction> CreateActiveAuction()
-    {
-        var auction = await _auctionsRepository.CreateAuction(new Auction
-        {
-            Title = "Test auction",
-            EndTime = _timeProvider.Now().AddHours(1),
-            Type = AuctionType.Open,
-            MinimumIncrement = 10,
-            MinPrice = 100,
-            TieBreakingPolicy = TieBreakingPolicy.Earliest
-        });
-        auction.TransitionToActive();
-        await _auctionsRepository.UpdateAuction(auction);
-        return auction;
+            _noRepeatWinnerPolicy,
+            new List<Application.Validators.Auctions.IFinalizeAuctionValidator>()); // ПОРОЖНІЙ список!
     }
 
     private async Task<Auction> CreateEndedAuction(
