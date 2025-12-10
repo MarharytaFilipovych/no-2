@@ -38,13 +38,26 @@ builder.Services.AddScoped<ILoginValidator, UserCredentialsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, SessionExistsValidator>();
 builder.Services.AddScoped<IRefreshTokenValidator, RefreshTokenMatchValidator>();
 
+builder.Services.AddScoped<IConfirmPaymentValidator, AuctionExistsForPaymentValidator>();
+builder.Services.AddScoped<IConfirmPaymentValidator, HasProvisionalWinnerValidator>();
+builder.Services.AddScoped<IConfirmPaymentValidator, PaymentDeadlinePassedValidator>();
+builder.Services.AddScoped<IConfirmPaymentValidator, SufficientBalanceValidator>();
+
+builder.Services.AddScoped<IFinalizeAuctionValidator, AuctionExistsForFinalizationValidator>();
+builder.Services.AddScoped<IFinalizeAuctionValidator, AuctionNotAlreadyFinalizedValidator>();
+builder.Services.AddScoped<IFinalizeAuctionValidator, AuctionCanBeFinalizedValidator>();
+
+builder.Services.AddScoped<IProcessPaymentDeadlineValidator, AuctionExistsForDeadlineValidator>();
+builder.Services.AddScoped<IProcessPaymentDeadlineValidator, HasProvisionalWinnerForDeadlineValidator>();
+builder.Services.AddScoped<IProcessPaymentDeadlineValidator, DeadlineHasPassedValidator>();
+
 builder.Services.AddSingleton<Domain.Auctions.AuctionVisibilityService>();
 builder.Services.AddSingleton<Domain.Auctions.WinnerSelectionService>();
 builder.Services.AddSingleton<Domain.Auctions.NoRepeatWinnerPolicy>();
 builder.Services.AddSingleton<Domain.Auctions.PaymentProcessingService>();
 builder.Services.AddSingleton<Domain.Users.BanPolicy>();
 
-builder.InstallConfigFromSection<IPaymentWindowConfig, PaymentWindowConfig>("PaymentWindow");   
+builder.InstallConfigFromSection<IPaymentWindowConfig, PaymentWindowConfig>("PaymentWindow");
 
 builder.Services.AddCors(options =>
 {
@@ -52,9 +65,9 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.SetIsOriginAllowed(_ => true)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
 });
 
