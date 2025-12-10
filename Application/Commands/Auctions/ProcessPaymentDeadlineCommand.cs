@@ -5,6 +5,7 @@ using Api.Users;
 using Application.Api.Utils;
 using Configs;
 using Utils;
+using Validators.Auctions;
 using Domain.Auctions;
 using Domain.Users;
 using MediatR;
@@ -39,36 +40,26 @@ public class ProcessPaymentDeadlineCommandHandler(
     WinnerSelectionService winnerSelectionService,
     NoRepeatWinnerPolicy noRepeatWinnerPolicy,
     PaymentProcessingService paymentProcessingService,
-    BanPolicy banPolicy)
+    BanPolicy banPolicy,
+    IEnumerable<IProcessPaymentDeadlineValidator> validators)
     : IRequestHandler<ProcessPaymentDeadlineCommand, ProcessPaymentDeadlineCommand.Response>
 {
-    public async Task<ProcessPaymentDeadlineCommand.Response> Handle(
-        ProcessPaymentDeadlineCommand request,
+    public async Task<ProcessPaymentDeadlineCommand.Response> Handle(ProcessPaymentDeadlineCommand request,
         CancellationToken cancellationToken)
     {
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
-        if (auction == null)
-            return ErrorResponse(ProcessPaymentError.AuctionNotFound);
-
-        if (!auction.HasProvisionalWinner())
-            return ErrorResponse(ProcessPaymentError.NoProvisionalWinner);
-
         var currentTime = timeProvider.Now();
-        if (!auction.IsPaymentDeadlinePassed(currentTime))
-            return ErrorResponse(ProcessPaymentError.DeadlineNotPassed);
 
-        var balance = await balanceRepository.GetBalance(auction.ProvisionalWinnerId!.Value);
+        var validationError = await ValidateDeadlineProcessing(auction, currentTime);
+        if (validationError != null)
+            return ErrorResponse(validationError.Value);
 
+        var balance = await balanceRepository.GetBalance(auction!.ProvisionalWinnerId!.Value);
         var allBids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
-
         var excludedUsers = await GetExcludedUsersForAuction(auction, currentTime);
 
-        var result = paymentProcessingService.ProcessPaymentDeadline(
-            auction,
-            allBids,
-            balance,
-            excludedUsers ?? new HashSet<Guid>(),
-            userId => IsUserBanned(userId, currentTime).Result);
+        var result = paymentProcessingService.ProcessPaymentDeadline(auction, allBids, balance,
+            excludedUsers ?? new HashSet<Guid>(), userId => IsUserBanned(userId, currentTime).Result);
 
         if (result.IsConfirmed)
         {
@@ -78,10 +69,7 @@ public class ProcessPaymentDeadlineCommandHandler(
 
         await BanUserForPaymentFailure(result.RejectedUserId!.Value, currentTime);
 
-        var newWinner = await winnerSelectionService.SelectWinner(
-            auction, 
-            result.EligibleBidsForPromotion, 
-            null);
+        var newWinner = await winnerSelectionService.SelectWinner(auction, result.EligibleBidsForPromotion, null);
 
         if (newWinner != null)
         {
@@ -95,6 +83,17 @@ public class ProcessPaymentDeadlineCommandHandler(
         return SuccessResponse(null, true);
     }
 
+    private async Task<ProcessPaymentError?> ValidateDeadlineProcessing(Auction? auction, DateTime currentTime)
+    {
+        foreach (var validator in validators)
+        {
+            var error = await validator.Validate(auction, currentTime);
+            if (error.HasValue) return error;
+        }
+
+        return null;
+    }
+
     private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction, DateTime currentTime)
     {
         if (string.IsNullOrEmpty(auction.Category))
@@ -105,10 +104,7 @@ public class ProcessPaymentDeadlineCommandHandler(
             return null;
 
         var finalizedInCategory = await auctionsRepository
-            .GetFinalizedAuctionsByCategoryAndPeriod(
-                auction.Category,
-                cycle.StartDate,
-                cycle.EndDate);
+            .GetFinalizedAuctionsByCategoryAndPeriod(auction.Category, cycle.StartDate, cycle.EndDate);
 
         return noRepeatWinnerPolicy.GetExcludedUsers(auction, finalizedInCategory);
     }
