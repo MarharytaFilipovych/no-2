@@ -49,6 +49,12 @@ public class ProcessPaymentDeadlineCommandHandler(
     {
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
         var currentTime = timeProvider.Now();
+        
+        if (auction != null && auction.CanTransitionToEnded(currentTime))
+        {
+            auction.TransitionToEnded();
+            await auctionsRepository.UpdateAuction(auction);
+        }
 
         var validationError = await ValidateDeadlineProcessing(auction, currentTime);
         if (validationError != null)

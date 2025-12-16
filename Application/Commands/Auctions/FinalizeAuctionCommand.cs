@@ -42,6 +42,12 @@ public class FinalizeAuctionCommandHandler(
         CancellationToken cancellationToken)
     {
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
+        
+        if (auction != null && auction.CanTransitionToEnded(timeProvider.Now()))
+        {
+            auction.TransitionToEnded();
+            await auctionsRepository.UpdateAuction(auction);
+        }
 
         var validationError = await ValidateFinalization(auction);
         if (validationError != null)
