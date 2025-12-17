@@ -47,8 +47,12 @@ public class FinalizeAuctionCommandHandler(
             return ErrorResponse(FinalizeAuctionError.InsufficientPermissions);
 
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
+        if (auction == null)
+            return ErrorResponse(FinalizeAuctionError.AuctionNotFound);
+
+        var now = timeProvider.Now();
         
-        if (auction != null && auction.CanTransitionToEnded(timeProvider.Now()))
+        if (auction.CanTransitionToEnded(now))
         {
             auction.TransitionToEnded();
             await auctionsRepository.UpdateAuction(auction);
@@ -58,14 +62,13 @@ public class FinalizeAuctionCommandHandler(
         if (validationError != null)
             return ErrorResponse(validationError.Value);
 
-        var currentTime = timeProvider.Now();
         var bids = await bidsRepository.GetActiveBidsByAuction(auction!.Id);
         var excludedUsers = await GetExcludedUsersForAuction(auction);
         var winner = await winnerSelectionService.SelectWinner(auction, bids, excludedUsers);
 
         if (winner != null)
         {
-            var deadline = currentTime.Add(paymentWindowConfig.PaymentDeadline);
+            var deadline = now.Add(paymentWindowConfig.PaymentDeadline);
             auction.FinalizeWithProvisionalWinner(winner.UserId, winner.Amount, deadline);
         }
         else auction.FinalizeWithNoWinner();
