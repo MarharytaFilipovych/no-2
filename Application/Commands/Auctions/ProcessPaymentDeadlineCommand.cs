@@ -53,9 +53,12 @@ public class ProcessPaymentDeadlineCommandHandler(
             return ErrorResponse(ProcessPaymentError.InsufficientPermissions);
 
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
+        if (auction == null)
+            return ErrorResponse(ProcessPaymentError.AuctionNotFound);
+
         var currentTime = timeProvider.Now();
         
-        if (auction != null && auction.CanTransitionToEnded(currentTime))
+        if (auction.CanTransitionToEnded(currentTime))
         {
             auction.TransitionToEnded();
             await auctionsRepository.UpdateAuction(auction);
