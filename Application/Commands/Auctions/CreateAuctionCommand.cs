@@ -20,6 +20,7 @@ public class CreateAuctionCommand : IRequest<CreateAuctionCommand.Response>
     public bool ShowMinPrice { get; init; }
     public TieBreakingPolicy TieBreakingPolicy { get; init; }
     public string? Category { get; init; }
+    public AuctionRole ActorRole { get; init; }
 
     public class Response
     {
@@ -32,7 +33,8 @@ public enum CreateAuctionError
 {
     InvalidTimeRange,
     InvalidIncrement,
-    InvalidTitle
+    InvalidTitle,
+    InsufficientPermissions
 }
 
 public class CreateAuctionCommandHandler(
@@ -45,6 +47,9 @@ public class CreateAuctionCommandHandler(
         CreateAuctionCommand request,
         CancellationToken cancellationToken)
     {
+        if (!AuctionPermissions.CanCreateAuction(request.ActorRole))
+            return ErrorResponse(CreateAuctionError.InsufficientPermissions);
+
         var currentTime = timeProvider.Now();
         var validationError = await ValidateCommand(request, currentTime);
         if (validationError != null)
@@ -84,7 +89,8 @@ public class CreateAuctionCommandHandler(
         MinPrice = request.MinPrice,
         SoftCloseWindow = request.SoftCloseWindow,
         ShowMinPrice = request.ShowMinPrice,
-        TieBreakingPolicy = request.TieBreakingPolicy
+        TieBreakingPolicy = request.TieBreakingPolicy,
+        Category = request.Category
     };
 
     private static CreateAuctionCommand.Response ErrorResponse(CreateAuctionError error) =>

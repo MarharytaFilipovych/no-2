@@ -1,18 +1,17 @@
+using Domain.Auctions;
+
 namespace Application.Validators.Auctions;
 
 using Commands.Auctions;
-using Api.Utils;
 
 public interface IProcessPaymentDeadlineValidator
 {
-    Task<ProcessPaymentError?> Validate(
-        Domain.Auctions.Auction? auction,
-        DateTime currentTime);
+    Task<ProcessPaymentError?> Validate(Auction? auction, DateTime currentTime);
 }
 
 public class AuctionExistsForDeadlineValidator : IProcessPaymentDeadlineValidator
 {
-    public Task<ProcessPaymentError?> Validate(Domain.Auctions.Auction? auction, DateTime currentTime)
+    public Task<ProcessPaymentError?> Validate(Auction? auction, DateTime currentTime)
     {
         return Task.FromResult<ProcessPaymentError?>(
             auction == null ? ProcessPaymentError.AuctionNotFound : null);
@@ -21,7 +20,7 @@ public class AuctionExistsForDeadlineValidator : IProcessPaymentDeadlineValidato
 
 public class HasProvisionalWinnerForDeadlineValidator : IProcessPaymentDeadlineValidator
 {
-    public Task<ProcessPaymentError?> Validate(Domain.Auctions.Auction? auction, DateTime currentTime)
+    public Task<ProcessPaymentError?> Validate(Auction? auction, DateTime currentTime)
     {
         if (auction == null) return Task.FromResult<ProcessPaymentError?>(null);
 
@@ -34,7 +33,7 @@ public class HasProvisionalWinnerForDeadlineValidator : IProcessPaymentDeadlineV
 
 public class DeadlineHasPassedValidator : IProcessPaymentDeadlineValidator
 {
-    public Task<ProcessPaymentError?> Validate(Domain.Auctions.Auction? auction, DateTime currentTime)
+    public Task<ProcessPaymentError?> Validate(Auction? auction, DateTime currentTime)
     {
         if (auction == null) return Task.FromResult<ProcessPaymentError?>(null);
 

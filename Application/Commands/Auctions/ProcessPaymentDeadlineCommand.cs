@@ -13,6 +13,7 @@ using MediatR;
 public class ProcessPaymentDeadlineCommand : IRequest<ProcessPaymentDeadlineCommand.Response>
 {
     public Guid AuctionId { get; init; }
+    public AuctionRole ActorRole { get; init; }
 
     public class Response
     {
@@ -26,7 +27,8 @@ public enum ProcessPaymentError
 {
     AuctionNotFound,
     NoProvisionalWinner,
-    DeadlineNotPassed
+    DeadlineNotPassed,
+    InsufficientPermissions
 }
 
 public class ProcessPaymentDeadlineCommandHandler(
@@ -47,6 +49,9 @@ public class ProcessPaymentDeadlineCommandHandler(
     public async Task<ProcessPaymentDeadlineCommand.Response> Handle(ProcessPaymentDeadlineCommand request,
         CancellationToken cancellationToken)
     {
+        if (!AuctionPermissions.CanProcessPaymentDeadline(request.ActorRole))
+            return ErrorResponse(ProcessPaymentError.InsufficientPermissions);
+
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
         var currentTime = timeProvider.Now();
         
@@ -62,10 +67,10 @@ public class ProcessPaymentDeadlineCommandHandler(
 
         var balance = await balanceRepository.GetBalance(auction!.ProvisionalWinnerId!.Value);
         var allBids = await bidsRepository.GetActiveBidsByAuction(auction.Id);
-        var excludedUsers = await GetExcludedUsersForAuction(auction, currentTime);
+        var excludedUsers = await GetExcludedUsersForAuction(auction);
 
         var result = paymentProcessingService.ProcessPaymentDeadline(auction, allBids, balance,
-            excludedUsers ?? new HashSet<Guid>(), userId => IsUserBanned(userId, currentTime).Result);
+            excludedUsers ?? [], userId => IsUserBanned(userId, currentTime).Result);
 
         if (result.IsConfirmed)
         {
@@ -75,7 +80,7 @@ public class ProcessPaymentDeadlineCommandHandler(
 
         await BanUserForPaymentFailure(result.RejectedUserId!.Value, currentTime);
 
-        var newWinner = await winnerSelectionService.SelectWinner(auction, result.EligibleBidsForPromotion, null);
+        var newWinner = await winnerSelectionService.SelectWinner(auction, result.EligibleBidsForPromotion);
 
         if (newWinner != null)
         {
@@ -100,7 +105,7 @@ public class ProcessPaymentDeadlineCommandHandler(
         return null;
     }
 
-    private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction, DateTime currentTime)
+    private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction)
     {
         if (string.IsNullOrEmpty(auction.Category))
             return null;

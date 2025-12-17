@@ -11,6 +11,7 @@ namespace Application.Commands.Auctions;
 public class FinalizeAuctionCommand : IRequest<FinalizeAuctionCommand.Response>
 {
     public Guid AuctionId { get; init; }
+    public AuctionRole ActorRole { get; init; }
 
     public class Response
     {
@@ -24,7 +25,8 @@ public enum FinalizeAuctionError
 {
     AuctionNotFound,
     AuctionNotEnded,
-    AlreadyFinalized
+    AlreadyFinalized,
+    InsufficientPermissions
 }
 
 public class FinalizeAuctionCommandHandler(
@@ -41,6 +43,9 @@ public class FinalizeAuctionCommandHandler(
     public async Task<FinalizeAuctionCommand.Response> Handle(FinalizeAuctionCommand request,
         CancellationToken cancellationToken)
     {
+        if (!AuctionPermissions.CanFinalizeAuction(request.ActorRole))
+            return ErrorResponse(FinalizeAuctionError.InsufficientPermissions);
+
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
         
         if (auction != null && auction.CanTransitionToEnded(timeProvider.Now()))
@@ -55,7 +60,7 @@ public class FinalizeAuctionCommandHandler(
 
         var currentTime = timeProvider.Now();
         var bids = await bidsRepository.GetActiveBidsByAuction(auction!.Id);
-        var excludedUsers = await GetExcludedUsersForAuction(auction, currentTime);
+        var excludedUsers = await GetExcludedUsersForAuction(auction);
         var winner = await winnerSelectionService.SelectWinner(auction, bids, excludedUsers);
 
         if (winner != null)
@@ -63,10 +68,7 @@ public class FinalizeAuctionCommandHandler(
             var deadline = currentTime.Add(paymentWindowConfig.PaymentDeadline);
             auction.FinalizeWithProvisionalWinner(winner.UserId, winner.Amount, deadline);
         }
-        else
-        {
-            auction.FinalizeWithNoWinner();
-        }
+        else auction.FinalizeWithNoWinner();
 
         await auctionsRepository.UpdateAuction(auction);
 
@@ -84,14 +86,12 @@ public class FinalizeAuctionCommandHandler(
         return null;
     }
 
-    private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction, DateTime currentTime)
+    private async Task<HashSet<Guid>?> GetExcludedUsersForAuction(Auction auction)
     {
-        if (string.IsNullOrEmpty(auction.Category))
-            return null;
+        if (string.IsNullOrEmpty(auction.Category)) return null;
 
         var cycle = await cycleRepository.GetActiveCycle();
-        if (cycle == null)
-            return null;
+        if (cycle == null) return null;
 
         var finalizedInCategory = await auctionsRepository
             .GetFinalizedAuctionsByCategoryAndPeriod(auction.Category, cycle.StartDate, cycle.EndDate);

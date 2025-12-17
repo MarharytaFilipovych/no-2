@@ -3,12 +3,14 @@ namespace Application.Commands.Auctions;
 using Application.Api.Auctions;
 using Application.Api.Utils;
 using Application.Validators.Auctions;
+using Domain.Auctions;
 using Utils;
 using MediatR;
 
 public class ConfirmPaymentCommand : IRequest<ConfirmPaymentCommand.Response>
 {
     public Guid AuctionId { get; init; }
+    public AuctionRole ActorRole { get; init; }
 
     public class Response
     {
@@ -22,7 +24,8 @@ public enum ConfirmPaymentError
     AuctionNotFound,
     NoProvisionalWinner,
     InsufficientBalance,
-    DeadlineAlreadyPassed
+    DeadlineAlreadyPassed,
+    InsufficientPermissions
 }
 
 public class ConfirmPaymentCommandHandler(
@@ -35,6 +38,9 @@ public class ConfirmPaymentCommandHandler(
     public async Task<ConfirmPaymentCommand.Response> Handle(ConfirmPaymentCommand request,
         CancellationToken cancellationToken)
     {
+        if (!AuctionPermissions.CanConfirmPayment(request.ActorRole))
+            return ErrorResponse(ConfirmPaymentError.InsufficientPermissions);
+
         var auction = await auctionsRepository.GetAuction(request.AuctionId);
         var currentTime = timeProvider.Now();
 
@@ -52,7 +58,7 @@ public class ConfirmPaymentCommandHandler(
         return SuccessResponse(true);
     }
 
-    private async Task<ConfirmPaymentError?> ValidatePaymentConfirmation(Domain.Auctions.Auction? auction,
+    private async Task<ConfirmPaymentError?> ValidatePaymentConfirmation(Auction? auction,
         decimal balance, DateTime currentTime)
     {
         foreach (var validator in validators)

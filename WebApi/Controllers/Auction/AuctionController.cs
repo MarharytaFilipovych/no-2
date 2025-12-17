@@ -1,4 +1,5 @@
 using WebApi.Controllers.Auctions.Contracts;
+using System.Security.Claims;
 
 namespace WebApi.Controllers.Auctions;
 
@@ -16,17 +17,30 @@ public class AuctionsController(
     IAuctionsRepository auctionsRepository,
     IBidsRepository bidsRepository) : ControllerBase
 {
-    [HttpPost]
+    [HttpPost, Authorize]
     [SwaggerResponse(StatusCodes.Status200OK, "Auction created successfully", typeof(AuctionCreatedResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid auction data")]
-    public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionRequest request)
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Insufficient permissions")]
+    public async Task<IActionResult> CreateAuction(
+        [FromBody] CreateAuctionRequest request,
+        [FromHeader(Name = "X-Role")] string? roleHeader)
     {
-        var command = MapToCommand(request);
+        var role = ParseRole(roleHeader);
+        
+        var command = MapToCommand(request, role);
         var result = await mediator.Send(command);
 
-        return result.Result.IsError
-            ? BadRequest(new { error = result.Result.GetError().ToString() })
-            : Ok(new AuctionCreatedResponse(result.AuctionId));
+        if (result.Result.IsError)
+        {
+            return result.Result.GetError() switch
+            {
+                CreateAuctionError.InsufficientPermissions => 
+                    StatusCode(403, new { error = "Forbidden: Admin role required" }),
+                _ => BadRequest(new { error = result.Result.GetError().ToString() })
+            };
+        }
+
+        return Ok(new AuctionCreatedResponse(result.AuctionId));
     }
 
     [HttpGet("active")]
@@ -78,22 +92,36 @@ public class AuctionsController(
         return Ok(new BidPlacedResponse(result.BidId));
     }
 
-    [HttpPost("{auctionId}/finalize")]
+    [HttpPost("{auctionId}/finalize"), Authorize]
     [SwaggerResponse(StatusCodes.Status200OK, "Auction finalized", typeof(AuctionFinalizedResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot finalize auction")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Insufficient permissions")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Auction not found")]
-    public async Task<IActionResult> FinalizeAuction(Guid auctionId)
+    public async Task<IActionResult> FinalizeAuction(
+        Guid auctionId,
+        [FromHeader(Name = "X-Role")] string? roleHeader)
     {
-        var command = new FinalizeAuctionCommand { AuctionId = auctionId };
+        var role = ParseRole(roleHeader);
+        
+        var command = new FinalizeAuctionCommand 
+        { 
+            AuctionId = auctionId,
+            ActorRole = role
+        };
         var result = await mediator.Send(command);
 
         if (result.Result.IsError)
         {
             return result.Result.GetError() switch
             {
-                FinalizeAuctionError.AuctionNotFound => NotFound(new { error = "Auction not found!" }),
-                FinalizeAuctionError.AlreadyFinalized => BadRequest(new { error = "Auction already finalized!" }),
-                FinalizeAuctionError.AuctionNotEnded => BadRequest(new { error = "Auction not ended yet!" }),
+                FinalizeAuctionError.AuctionNotFound => 
+                    NotFound(new { error = "Auction not found!" }),
+                FinalizeAuctionError.InsufficientPermissions => 
+                    StatusCode(403, new { error = "Forbidden: Admin role required" }),
+                FinalizeAuctionError.AlreadyFinalized => 
+                    BadRequest(new { error = "Auction already finalized!" }),
+                FinalizeAuctionError.AuctionNotEnded => 
+                    BadRequest(new { error = "Auction not ended yet!" }),
                 _ => BadRequest(new { error = result.Result.GetError().ToString() })
             };
         }
@@ -101,12 +129,21 @@ public class AuctionsController(
         return Ok(new AuctionFinalizedResponse(result.WinnerId, result.WinningAmount));
     }
 
-    [HttpPost("{auctionId}/confirm-payment")]
+    [HttpPost("{auctionId}/confirm-payment"), Authorize]
     [SwaggerResponse(StatusCodes.Status200OK, "Payment confirmed")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot confirm payment")]
-    public async Task<IActionResult> ConfirmPayment(Guid auctionId)
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Insufficient permissions")]
+    public async Task<IActionResult> ConfirmPayment(
+        Guid auctionId,
+        [FromHeader(Name = "X-Role")] string? roleHeader)
     {
-        var command = new ConfirmPaymentCommand { AuctionId = auctionId };
+        var role = ParseRole(roleHeader);
+        
+        var command = new ConfirmPaymentCommand 
+        { 
+            AuctionId = auctionId,
+            ActorRole = role
+        };
         var result = await mediator.Send(command);
 
         if (result.Result.IsError)
@@ -114,6 +151,8 @@ public class AuctionsController(
             return result.Result.GetError() switch
             {
                 ConfirmPaymentError.AuctionNotFound => NotFound(),
+                ConfirmPaymentError.InsufficientPermissions => 
+                    StatusCode(403, new { error = "Forbidden: Admin role required" }),
                 _ => BadRequest(new { error = result.Result.GetError().ToString() })
             };
         }
@@ -121,12 +160,21 @@ public class AuctionsController(
         return Ok(new { paymentConfirmed = result.PaymentConfirmed });
     }
 
-    [HttpPost("{auctionId}/process-deadline")]
+    [HttpPost("{auctionId}/process-deadline"), Authorize]
     [SwaggerResponse(StatusCodes.Status200OK, "Deadline processed")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Cannot process deadline")]
-    public async Task<IActionResult> ProcessPaymentDeadline(Guid auctionId)
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Insufficient permissions")]
+    public async Task<IActionResult> ProcessPaymentDeadline(
+        Guid auctionId,
+        [FromHeader(Name = "X-Role")] string? roleHeader)
     {
-        var command = new ProcessPaymentDeadlineCommand { AuctionId = auctionId };
+        var role = ParseRole(roleHeader);
+        
+        var command = new ProcessPaymentDeadlineCommand 
+        { 
+            AuctionId = auctionId,
+            ActorRole = role
+        };
         var result = await mediator.Send(command);
 
         if (result.Result.IsError)
@@ -134,6 +182,8 @@ public class AuctionsController(
             return result.Result.GetError() switch
             {
                 ProcessPaymentError.AuctionNotFound => NotFound(),
+                ProcessPaymentError.InsufficientPermissions => 
+                    StatusCode(403, new { error = "Forbidden: Admin role required" }),
                 _ => BadRequest(new { error = result.Result.GetError().ToString() })
             };
         }
@@ -145,7 +195,16 @@ public class AuctionsController(
         });
     }
 
-    private static CreateAuctionCommand MapToCommand(CreateAuctionRequest request) => new()
+    private static AuctionRole ParseRole(string? roleHeader)
+    {
+        if (string.IsNullOrWhiteSpace(roleHeader))
+            return AuctionRole.Participant;
+
+        return Enum.TryParse<AuctionRole>(roleHeader, ignoreCase: true, out var role) 
+            ? role : AuctionRole.Participant;
+    }
+
+    private static CreateAuctionCommand MapToCommand(CreateAuctionRequest request, AuctionRole role) => new()
     {
         Title = request.Title,
         Description = request.Description,
@@ -157,7 +216,8 @@ public class AuctionsController(
         MinPrice = request.MinPrice,
         SoftCloseWindow = request.SoftCloseWindow,
         ShowMinPrice = request.ShowMinPrice,
-        TieBreakingPolicy = request.TieBreakingPolicy
+        TieBreakingPolicy = request.TieBreakingPolicy,
+        ActorRole = role
     };
 
     private async Task<IEnumerable<AuctionListResponse>> MapToListResponse(List<Auction> auctions)
@@ -166,8 +226,7 @@ public class AuctionsController(
             a.Id, a.Title, a.Description,
             a.EndTime, a.Type.ToString(),
             a.ShowMinPrice ? a.MinPrice : null, a.Type == AuctionType.Open
-                ? (await bidsRepository.GetHighestBidForAuction(a.Id))?.Amount
-                : null
+                ? (await bidsRepository.GetHighestBidForAuction(a.Id))?.Amount : null
         ));
 
         return await Task.WhenAll(responseTasks);
@@ -197,5 +256,5 @@ public class AuctionsController(
         auction.State == AuctionState.Finalized;
 
     private Guid GetUserId() =>
-        Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+        Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 }
